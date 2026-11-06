@@ -148,6 +148,63 @@
     return out;
   }
   const tvText = (g) => (g.networks.length ? g.networks.join(' / ') : 'TBA');
+
+  // Free live radio from the UK Sports Network, for games that haven't finished.
+  const radioFor = (g) => {
+    const mode = SPORTS[g.sport]?.radio;
+    return CFG.radio && mode && g.state !== 'post' ? { ...CFG.radio, select: mode === 'select' } : null;
+  };
+  const listenTitle = (r) => `${r.label} on ${r.station}${r.select ? ' (select matches are on the radio)' : ''}`;
+  // Game cards are links themselves, so the radio button inside them is a span handled by the click delegate.
+  const listenChip = (g) => {
+    const r = radioFor(g);
+    return r ? `<span class="listen" role="link" tabindex="0" data-listen="${esc(r.url)}" title="${esc(listenTitle(r))}">🎧 Listen live</span>` : '';
+  };
+  const listenLink = (g, cls = 'listen') => {
+    const r = radioFor(g);
+    return r ? `<a class="${cls}" href="${esc(r.url)}" target="_blank" rel="noopener" data-listen-link title="${esc(listenTitle(r))}">🎧 Listen live</a>` : '';
+  };
+
+  // ---------- game-day weather (outdoor sports) ----------
+  // Free forecasts from Open-Meteo (no key needed); they reach about two weeks ahead.
+  const DOMES = /dome|mercedes-benz stadium|at&t stadium|nrg stadium|allegiant|ford field|lucas oil|u\.s\. bank stadium|state farm stadium|tropicana|daikin park|minute maid|rogers centre|chase field|globe life field|american family field|t-mobile park|loandepot/i;
+  const STATES = { AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California', CO: 'Colorado', CT: 'Connecticut', DE: 'Delaware', DC: 'District of Columbia', FL: 'Florida', GA: 'Georgia', HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois', IN: 'Indiana', IA: 'Iowa', KS: 'Kansas', KY: 'Kentucky', LA: 'Louisiana', ME: 'Maine', MD: 'Maryland', MA: 'Massachusetts', MI: 'Michigan', MN: 'Minnesota', MS: 'Mississippi', MO: 'Missouri', MT: 'Montana', NE: 'Nebraska', NV: 'Nevada', NH: 'New Hampshire', NJ: 'New Jersey', NM: 'New Mexico', NY: 'New York', NC: 'North Carolina', ND: 'North Dakota', OH: 'Ohio', OK: 'Oklahoma', OR: 'Oregon', PA: 'Pennsylvania', RI: 'Rhode Island', SC: 'South Carolina', SD: 'South Dakota', TN: 'Tennessee', TX: 'Texas', UT: 'Utah', VT: 'Vermont', VA: 'Virginia', WA: 'Washington', WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming' };
+  const WX = [[0, '☀️', 'Clear'], [1, '🌤️', 'Mostly clear'], [2, '⛅', 'Partly cloudy'], [3, '☁️', 'Cloudy'], [48, '🌫️', 'Fog'], [57, '🌦️', 'Drizzle'], [65, '🌧️', 'Rain'], [67, '🌧️', 'Freezing rain'], [77, '🌨️', 'Snow'], [82, '🌦️', 'Showers'], [86, '🌨️', 'Snow showers'], [99, '⛈️', 'Thunderstorms']];
+  const wxKind = (code) => WX.find(([max]) => code <= max) || WX[3];
+  const wantsWeather = (g) => SPORTS[g.sport]?.weather && g.state !== 'post' && g.timeValid && g.city && !DOMES.test(g.venue)
+    && g.date - Date.now() < 14 * 864e5;
+  const geoCache = {};
+  const geocode = (city) => (geoCache[city] ||= (async () => {
+    const [name, st] = city.split(',').map((x) => x.trim());
+    const state = STATES[(st || '').toUpperCase()] || st;
+    const d = await getJSON(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=10&countryCode=US`);
+    const hit = (d.results || []).find((r) => !state || r.admin1 === state) || d.results?.[0];
+    if (!hit) throw new Error('place not found');
+    return hit;
+  })());
+  const wxCache = {};
+  const wxDone = {}; // finished forecasts, so redrawn cards show them right away
+  const gameWeather = (g) => (wxCache[g.id] ||= (async () => {
+    const loc = await geocode(g.city);
+    const at = new Date(Math.round(g.date / 36e5) * 36e5); // nearest hour to the start time
+    const day = at.toISOString().slice(0, 10);
+    const d = await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${loc.latitude}&longitude=${loc.longitude}&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=GMT&start_date=${day}&end_date=${day}`);
+    const i = d.hourly.time.indexOf(at.toISOString().slice(0, 13) + ':00');
+    if (i < 0) return null;
+    const h = d.hourly;
+    return (wxDone[g.id] = { temp: Math.round(h.temperature_2m[i]), rain: h.precipitation_probability[i] ?? 0, code: h.weather_code[i], wind: Math.round(h.wind_speed_10m[i]) });
+  })().catch(() => null));
+  const wxShort = (w) => `${wxKind(w.code)[1]} <b>${w.temp}°</b> ${esc(wxKind(w.code)[2])} · ${w.rain}% rain`;
+  const wxLong = (w) => `${wxKind(w.code)[1]} <b>${w.temp}°F</b>, ${esc(wxKind(w.code)[2].toLowerCase())} · ${w.rain}% chance of rain · wind ${w.wind} mph`;
+  const wxSlot = (g, long) => (wantsWeather(g)
+    ? `<div class="wx" data-wx="${esc(g.id)}"${long ? ' data-long' : ''}>${wxDone[g.id] ? (long ? wxLong : wxShort)(wxDone[g.id]) : ''}</div>` : '');
+  // Fills every forecast slot in `root` once its forecast arrives.
+  function fillWeather(root, games) {
+    root.querySelectorAll('[data-wx]').forEach((el) => {
+      const g = games.find((x) => String(x.id) === el.dataset.wx);
+      if (g) gameWeather(g).then((w) => { if (w) el.innerHTML = ('long' in el.dataset ? wxLong : wxShort)(w); else el.remove(); });
+    });
+  }
   const whereText = (g) => (g.neutral ? 'vs' : g.home ? 'vs' : '@');
 
   // ---------- components ----------
@@ -172,7 +229,9 @@
         <div class="meta">
           <div>📍 ${esc(g.venue)}${g.city ? `, ${esc(g.city)}` : ''}</div>
           <div>📺 <b>${esc(tvText(g))}</b></div>
+          ${wxSlot(g)}
         </div>
+        ${listenChip(g)}
       </a>`;
   }
 
@@ -202,7 +261,8 @@
           <h1>${whereText(g) === '@' ? 'at' : 'vs'} ${esc(g.oppRank)}${esc(g.opp.displayName || g.opp.shortDisplayName)}</h1>
           <div class="when">${when}</div>
           <div class="when small">📍 ${esc(g.venue)}${g.city ? `, ${esc(g.city)}` : ''} · 📺 ${esc(tvText(g))}</div>
-          <a class="btn" href="#/game/${g.sport}/${g.id}">${g.state === 'in' ? 'Follow live' : 'Game preview'} →</a>
+          ${wxSlot(g, true)}
+          <div class="banner-btns"><a class="btn" href="#/game/${g.sport}/${g.id}">${g.state === 'in' ? 'Follow live' : 'Game preview'} →</a>${listenLink(g, 'btn ghost')}</div>
         </div>
         <img class="opp-logo" src="${esc(logoOf(g.opp))}" alt="">
       </section>`;
@@ -218,13 +278,15 @@
           <td><div class="oppcell"><img src="${esc(logoOf(g.opp))}" alt="" loading="lazy">
             <span><span class="muted small">${whereText(g)}</span> ${esc(g.oppRank)}${esc(g.opp.shortDisplayName || g.opp.displayName)}</span></div></td>
           <td class="venue-col small muted">${esc(g.venue)}</td>
-          <td style="text-align:right">${statusLine(g)}<div class="tv">${g.state === 'pre' ? esc(tvText(g)) : ''}</div></td>
+          <td style="text-align:right">${statusLine(g)}<div class="tv">${g.state === 'pre' ? esc(tvText(g)) : ''}</div>${listenLink(g)}</td>
         </tr>`;
     }).join('')}</tbody></table>`;
   }
 
   function bindRowLinks(root) {
-    root.querySelectorAll('tr[data-href]').forEach((tr) => tr.addEventListener('click', () => { location.hash = tr.dataset.href; }));
+    root.querySelectorAll('tr[data-href]').forEach((tr) => tr.addEventListener('click', (e) => {
+      if (!e.target.closest('a')) location.hash = tr.dataset.href;
+    }));
   }
 
   // ---------- pages ----------
@@ -255,6 +317,7 @@
         ${data.failed ? `<div class="error small">${data.failed} sport schedule(s) failed to load.</div>` : ''}
       `;
       bindRowLinks(view);
+      fillWeather(view, data.games);
       if (featured) bannerPhoto(featured.sport).then((url) => setPhoto(view.querySelector('.home-banner'), url));
     };
     draw();
@@ -365,6 +428,7 @@
       fill('#t-next', next ? `<div class="next-wrap">${gameCard(next)}</div>` : '<div class="empty">No upcoming games scheduled yet.</div>');
       fill('#t-schedule', scheduleTable(games));
       bindRowLinks(view.querySelector('#t-schedule'));
+      fillWeather(view, games);
       if (!heroBits.record) {
         const w = games.filter((g) => g.result === 'W').length, l = games.filter((g) => g.result === 'L').length;
         if (w + l) { heroBits.record = `${w}-${l}`; drawHero(); }
@@ -450,17 +514,28 @@
       drawPolls();
     }).catch(() => fill('#t-polls', '<div class="empty">ESPN doesn\'t publish polls for this sport.</div>'));
 
-    // News — betting stories and ESPN+ paywalled stories are filtered out.
-    getJSON(`${base}/news?team=${id}&limit=20`).then((d) => {
+    // News: ESPN and official UKAthletics.com stories together, newest first. Betting stories and
+    // ESPN+ paywalled stories are filtered out.
+    const espnNews = getJSON(`${base}/news?team=${id}&limit=20`).then((d) => (d.articles || [])
+      .filter((a) => !a.premium && !/\/betting\/|\/fantasy\//.test(a.links?.web?.href || ''))
+      .map((a) => ({
+        source: 'ESPN', headline: a.headline, text: a.description || '', date: new Date(a.published), href: a.links?.web?.href || '#',
+        api: a.links?.api?.self?.href || '', thumb: a.images?.[0]?.url, video: a.type === 'Media',
+      })));
+    Promise.allSettled([espnNews, ukNews(sport)]).then(([espn, uk]) => {
       if (!current()) return;
-      const items = (d.articles || []).filter((a) =>
-        !a.premium && !BETTING.test(`${a.headline} ${a.description || ''}`) && !/\/betting\/|\/fantasy\//.test(a.links?.web?.href || '')).slice(0, 8);
-      fill('#t-news', items.length ? `<div class="news">${items.map((a) => `
-        <a class="news-item" href="${esc(a.links?.web?.href || '#')}" target="_blank" rel="noopener" data-api="${esc(a.links?.api?.self?.href || '')}">
-          ${a.images?.[0]?.url ? `<span class="news-thumb"><img src="${esc(a.images[0].url)}" alt="" loading="lazy">${a.type === 'Media' ? '<span class="play">▶</span>' : ''}</span>` : ''}
-          <span><b>${esc(a.headline)}</b><span class="small muted">${esc(new Date(a.published).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }))}</span></span>
+      if (espn.status === 'rejected' && uk.status === 'rejected') return fail('#t-news', 'News');
+      const items = [...(espn.value || []), ...(uk.value || [])]
+        .filter((n) => !BETTING.test(`${n.headline} ${n.text}`))
+        .sort((a, b) => b.date - a.date).slice(0, 12);
+      fill('#t-news', items.length ? `<div class="news">${items.map((n) => `
+        <a class="news-item" href="${esc(n.href)}" target="_blank" rel="noopener" ${n.uk ? `data-uk="${esc(n.uk)}"` : `data-api="${esc(n.api)}"`}>
+          <span class="news-thumb">${n.thumb ? `<img src="${esc(n.thumb)}" alt="" loading="lazy"${n.full ? ` data-full="${esc(n.full)}"` : ''}>` : '<span class="no-thumb"></span>'}${n.video ? '<span class="play">▶</span>' : n.gallery ? '<span class="play">📷</span>' : ''}</span>
+          <span><b>${esc(n.headline)}</b><span class="small muted">${esc(n.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }))} · <span class="src${n.uk ? ' uk' : ''}">${esc(n.source)}</span></span></span>
         </a>`).join('')}</div>` : '<div class="empty">No recent news.</div>');
-    }).catch(() => fail('#t-news', 'News'));
+      // Some UK photos have no small copy; fall back to the full photo.
+      view.querySelectorAll('#t-news img[data-full]').forEach((img) => img.addEventListener('error', () => { img.src = img.dataset.full; img.removeAttribute('data-full'); }, { once: true }));
+    }).catch((e) => { console.error(e); fail('#t-news', 'News'); });
 
     // Roster (+ head coach for the hero).
     getJSON(`${base}/teams/${id}/roster`).then((d) => {
@@ -536,6 +611,11 @@
 
     const networks = (comp.broadcasts || d.broadcasts || []).map((b) => b.media?.shortName).filter(Boolean);
     const watch = watchLinks(networks);
+    const venue = d.gameInfo?.venue || comp.venue || {};
+    const game = { // just enough of a schedule game for the radio and weather helpers
+      id: String(comp.id || d.header.id), sport: sportKey, state: st.state, date: new Date(comp.date), timeValid: comp.timeValid !== false,
+      venue: venue.fullName || '', city: [venue.address?.city, venue.address?.state].filter(Boolean).join(', '),
+    };
     const isLive = st.state === 'in';
 
     const teamBlock = (c) => `
@@ -574,7 +654,10 @@
         <h2>How to watch</h2>
         <div class="watch-row">
           ${networks.length ? `<span>📺 <b>${esc(networks.join(' / '))}</b></span>` : '<span class="muted">Broadcast TBA</span>'}
-          ${watch.map((w) => `<a class="btn ${w.cls}" href="${esc(w.href)}" target="_blank" rel="noopener">▶ ${esc(w.label)}</a>`).join('')}        </div>
+          ${watch.map((w) => `<a class="btn ${w.cls}" href="${esc(w.href)}" target="_blank" rel="noopener">▶ ${esc(w.label)}</a>`).join('')}
+          ${listenLink(game, 'btn secondary')}
+        </div>
+        ${wantsWeather(game) ? `<div class="wx-line">Game-day forecast: ${wxSlot(game, true)}</div>` : ''}
         <p class="small muted" style="margin-bottom:0">YouTube TV doesn't allow its stream to be embedded in other sites, so this button opens the YouTube TV live guide (or app on your phone).</p>
       </section>
 
@@ -583,6 +666,7 @@
     `;
 
     setPhoto(view.querySelector('#scorebug'), d.gameInfo?.venue?.images?.[0]?.href);
+    fillWeather(view, [game]);
     const body = view.querySelector('#tab-body');
     const renderTab = () => {
       const t = gameState.tab;
@@ -769,11 +853,68 @@
     playerVideo.play().catch(() => { /* autoplay blocked; controls are there */ });
   }
   view.addEventListener('click', (e) => {
+    const listen = e.target.closest('[data-listen]');
+    if (listen) { e.preventDefault(); window.open(listen.dataset.listen, '_blank', 'noopener'); return; }
     const btn = e.target.closest('.video[data-src]');
     if (btn) openPlayer(btn.dataset);
     const story = e.target.closest('.news-item[data-api]');
     if (story?.dataset.api) { e.preventDefault(); openReader(story.dataset.api, story.href); }
+    const ukStory = e.target.closest('.news-item[data-uk]');
+    if (ukStory && ukStories.has(ukStory.dataset.uk)) { e.preventDefault(); openUkStory(ukStories.get(ukStory.dataset.uk)); }
   });
+  view.addEventListener('keydown', (e) => {
+    const listen = e.key === 'Enter' && e.target.closest('[data-listen]');
+    if (listen) { e.preventDefault(); window.open(listen.dataset.listen, '_blank', 'noopener'); }
+  });
+
+  // ---------- official UKAthletics.com news ----------
+  // The site's news lists allow other sites to read them (its story pages don't), so stories show
+  // their photo and headline here, with the full text one tap away on UKAthletics.com.
+  const decodeHtml = (s) => new DOMParser().parseFromString(s || '', 'text/html').documentElement.textContent;
+  // Photo addresses end with the original image's address in base64; WordPress keeps a 150px copy beside it.
+  const ukPhoto = (proxied) => {
+    try {
+      const enc = (proxied || '').split('/').pop().replace(/\.\w+$/, '');
+      const url = atob(enc.replace(/-/g, '+').replace(/_/g, '/'));
+      if (!/^https:\/\/storage\.googleapis\.com\/ukathletics-com\//.test(url)) return null;
+      return { full: url, thumb: url.replace(/(\.\w+)$/, '-150x150$1') };
+    } catch { return null; }
+  };
+  let ukPhotoMap;
+  // The photo list covers the newest stories across all sports, which is what the News card shows.
+  const ukPhotos = () => (ukPhotoMap ||= Promise.all([1, 2, 3].map((page) =>
+    getJSON(`${CFG.ukAthletics}/wp-json/v1/news?per_page=24&page=${page}`).catch(() => ({}))))
+    .then((pages) => new Map(pages.flatMap((p) => p.data || []).map((n) => [n.id, ukPhoto(n.thumbnail || n.image)]))));
+  const ukStories = new Map();
+  async function ukNews(sport) {
+    if (!CFG.ukAthletics || !sport.ukSport) return [];
+    const [posts, photos] = await Promise.all([
+      getJSON(`${CFG.ukAthletics}/wp-json/wp/v2/posts?sport_category=${sport.ukSport}&per_page=12&_fields=id,date_gmt,link,title,format`),
+      ukPhotos().catch(() => new Map()),
+    ]);
+    return posts.filter((p) => /^https:\/\/ukathletics\.com\//.test(p.link)).map((p) => {
+      const photo = photos.get(p.id);
+      const story = {
+        uk: String(p.id), source: 'UK Athletics', headline: decodeHtml(p.title?.rendered), text: '',
+        date: new Date(`${p.date_gmt}Z`), href: p.link, thumb: photo?.thumb, full: photo?.full,
+        video: p.format === 'video', gallery: p.format === 'gallery',
+      };
+      ukStories.set(story.uk, story);
+      return story;
+    });
+  }
+  function openUkStory(n) {
+    reader.querySelector('.player-title').textContent = 'UK Athletics';
+    const kind = n.video ? 'Watch the video' : n.gallery ? 'See the photo gallery' : 'Read the full story';
+    readerBody.innerHTML = `
+      <h1>${esc(n.headline)}</h1>
+      <p class="reader-meta">${esc(n.date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }))}</p>
+      ${n.full ? `<figure><img src="${esc(n.full)}" alt=""></figure>` : ''}
+      <p><a class="btn" href="${esc(n.href)}" target="_blank" rel="noopener">${kind} on UKAthletics.com →</a></p>
+      <p class="reader-source">Source: <a href="${esc(n.href)}" target="_blank" rel="noopener">UKAthletics.com</a> (official UK Athletics)</p>`;
+    reader.showModal();
+    readerBody.scrollTop = 0;
+  }
 
   // ---------- news pop-up ----------
   // espn.com refuses to load inside other sites, so stories are rendered from ESPN's story feed

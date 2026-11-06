@@ -126,6 +126,12 @@ button { font: inherit; }
 .news-item:hover { background: var(--surface-2); }
 .news-item img { width: 84px; aspect-ratio: 16/9; object-fit: cover; border-radius: 6px; }
 .news-thumb { position: relative; display: block; }
+.news-thumb .no-thumb {
+  display: block; width: 84px; aspect-ratio: 16/9; border-radius: 6px;
+  background: var(--uk-blue) url("https://a.espncdn.com/i/teamlogos/ncaa/500-dark/96.png") center / 34% no-repeat;
+}
+.news-item .src { font-weight: 700; }
+.news-item .src.uk { color: var(--uk-blue); }
 .news-thumb .play {
   position: absolute; inset: 0; margin: auto; width: 26px; height: 26px; border-radius: 50%;
   display: grid; place-items: center; background: rgba(0, 0, 0, .6); color: #fff; font-size: 11px;
@@ -237,6 +243,14 @@ button { font: inherit; }
 .gcard .opp img { width: 28px; height: 28px; object-fit: contain; flex: none; }
 .gcard .opp .va { color: var(--muted); font-weight: 600; font-size: 12px; }
 .gcard .meta { font-size: 12px; color: var(--muted); margin-top: 6px; display: grid; gap: 2px; }
+.gcard .wx b { color: var(--text); }
+.gcard .listen {
+  display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; padding: 3px 9px; border-radius: 999px;
+  font-size: 12px; font-weight: 700; color: var(--uk-blue); background: color-mix(in srgb, var(--uk-blue) 10%, transparent);
+}
+.gcard .listen:hover { background: var(--uk-blue); color: #fff; }
+.wx-line { margin-top: 10px; font-size: 14px; }
+.wx-line .wx { display: inline; }
 .gcard .meta b { color: var(--text); font-weight: 600; }
 .gcard .score { font-weight: 800; font-size: 14px; }
 
@@ -249,6 +263,7 @@ button { font: inherit; }
 .sched .oppcell img { width: 26px; height: 26px; object-fit: contain; }
 .sched .when { white-space: nowrap; }
 .sched .tv { color: var(--muted); font-size: 13px; }
+.sched .listen { font-size: 12.5px; font-weight: 700; white-space: nowrap; }
 @media (max-width: 640px) {
   .sched .venue-col { display: none; }
   .sched td { padding: 9px 4px; font-size: 13px; }
@@ -449,7 +464,10 @@ button { font: inherit; }
 .home-banner .eyebrow { font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; opacity: .85; }
 .home-banner h1 { margin: 6px 0 8px; font-size: 30px; line-height: 1.1; }
 .home-banner .when { font-size: 15px; opacity: .95; }
-.home-banner .btn { margin-top: 14px; background: #fff; color: var(--uk-blue); }
+.home-banner .btn { background: #fff; color: var(--uk-blue); }
+.home-banner .banner-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.home-banner .btn.ghost { background: rgba(255, 255, 255, .14); color: #fff; border: 1px solid rgba(255, 255, 255, .5); }
+.home-banner .wx { margin-top: 4px; font-size: 13px; opacity: .9; }
 .home-banner .opp-logo { width: 96px; height: 96px; object-fit: contain; background: rgba(255,255,255,.95); border-radius: 50%; padding: 12px; }
 @media (max-width: 640px) {
   .home-banner { padding: 18px; min-height: 150px; }
@@ -463,7 +481,7 @@ button { font: inherit; }
 .card > h2::after {
   content: ""; position: absolute; left: 0; top: 2px; bottom: 2px; width: 4px; border-radius: 2px; background: var(--uk-blue);
 }
-@media (prefers-color-scheme: dark) { .card > h2::after { background: var(--uk-accent); } .titles .count { color: var(--uk-accent); } }
+@media (prefers-color-scheme: dark) { .card > h2::after { background: var(--uk-accent); } .titles .count, .news-item .src.uk, .gcard .listen { color: var(--uk-accent); } .gcard .listen:hover { color: #fff; } }
 
 /* Roster headshots */
 .roster-list li { grid-template-columns: 30px 40px 1fr; align-items: center; }

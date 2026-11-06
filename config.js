@@ -5,13 +5,15 @@ window.UK_CONFIG = {
 
   // Every team the app supports. Viewers pick which ones they see on the Settings page;
   // `on: true` marks the default picks. x / ig are the team's official social accounts.
-  // `sec` is ESPN's standings group id for the SEC in that sport.
+  // `sec` is ESPN's standings group id for the SEC in that sport. `ukSport` is the sport's id on
+  // UKAthletics.com (for official news). `radio` is 'all' when every game is on the UK Sports Network
+  // or 'select' when only some are. `weather: true` shows the game-day forecast (outdoor sports).
   sports: [
-    { key: 'mbb', label: "Men's Basketball", short: 'MBB', path: 'basketball/mens-college-basketball', sec: '23', on: true, x: 'KentuckyMBB', ig: 'kentuckymbb' },
-    { key: 'football', label: 'Football', short: 'FB', path: 'football/college-football', sec: '8', on: true, x: 'UKFootball', ig: 'ukfootball' },
-    { key: 'baseball', label: 'Baseball', short: 'BSB', path: 'baseball/college-baseball', teamId: '82', sec: '27', on: true, x: 'UKBaseball', ig: 'kentuckybaseball' },
-    { key: 'wvb', label: 'Volleyball', short: 'WVB', path: 'volleyball/womens-college-volleyball', sec: '71', on: true, x: 'KentuckyVB', ig: 'kentuckyvolleyball' },
-    { key: 'wbb', label: "Women's Basketball", short: 'WBB', path: 'basketball/womens-college-basketball', sec: '23', on: false, x: 'KentuckyWBB', ig: 'kentuckywbb' },
+    { key: 'mbb', label: "Men's Basketball", short: 'MBB', path: 'basketball/mens-college-basketball', sec: '23', on: true, ukSport: 130, radio: 'all', x: 'KentuckyMBB', ig: 'kentuckymbb' },
+    { key: 'football', label: 'Football', short: 'FB', path: 'football/college-football', sec: '8', on: true, ukSport: 115, radio: 'all', weather: true, x: 'UKFootball', ig: 'ukfootball' },
+    { key: 'baseball', label: 'Baseball', short: 'BSB', path: 'baseball/college-baseball', teamId: '82', sec: '27', on: true, ukSport: 105, radio: 'all', weather: true, x: 'UKBaseball', ig: 'kentuckybaseball' },
+    { key: 'wvb', label: 'Volleyball', short: 'WVB', path: 'volleyball/womens-college-volleyball', sec: '71', on: true, ukSport: 118, radio: 'select', x: 'KentuckyVB', ig: 'kentuckyvolleyball' },
+    { key: 'wbb', label: "Women's Basketball", short: 'WBB', path: 'basketball/womens-college-basketball', sec: '23', on: false, ukSport: 109, radio: 'all', x: 'KentuckyWBB', ig: 'kentuckywbb' },
   ],
 
   // Championship counts shown on each team page. Update these when Kentucky wins another one.
@@ -42,6 +44,12 @@ window.UK_CONFIG = {
       { label: 'SEC tournament titles', count: 2, note: '1982, 2022' },
     ],
   },
+
+  // Official UK Athletics news (UKAthletics.com allows other sites to read its news list).
+  ukAthletics: 'https://ukathletics.com',
+
+  // Free live radio: the UK Sports Network streams every broadcast on WLAP 630 through iHeartRadio.
+  radio: { label: 'UK Sports Network', station: 'WLAP 630', url: 'https://www.iheart.com/live/newsradio-630-wlap-965/' },
 
   // Department-wide accounts, always shown alongside the chosen teams' accounts.
   xHandles: ['UKAthletics'],

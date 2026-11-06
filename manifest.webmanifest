@@ -1,0 +1,11 @@
+{
+  "name": "Big Blue Hub",
+  "short_name": "Big Blue",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0033a0",
+  "theme_color": "#0033a0",
+  "icons": [
+    { "src": "https://a.espncdn.com/i/teamlogos/ncaa/500/96.png", "sizes": "500x500", "type": "image/png" }
+  ]
+}

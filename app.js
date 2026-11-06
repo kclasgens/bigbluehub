@@ -397,6 +397,7 @@
           <section class="card" id="t-news"><h2>News</h2><div class="loading">Loading…</div></section>
           <section class="card" id="t-roster"><h2>Roster</h2><div class="loading">Loading…</div></section>
           <section class="card"><h2>Follow</h2><div class="social-grid one-col">
+            ${sport.fb ? `<a class="social-link" href="https://www.facebook.com/${esc(sport.fb)}" target="_blank" rel="noopener"><span class="ico fb">f</span><span>${esc(sport.fb)}<span class="who">on Facebook</span></span></a>` : ''}
             <a class="social-link" href="https://x.com/${esc(sport.x)}" target="_blank" rel="noopener"><span class="ico x">𝕏</span><span>@${esc(sport.x)}<span class="who">on X</span></span></a>
             <a class="social-link" href="https://www.instagram.com/${esc(sport.ig)}/" target="_blank" rel="noopener"><span class="ico ig">◎</span><span>@${esc(sport.ig)}<span class="who">on Instagram</span></span></a>
           </div></section>

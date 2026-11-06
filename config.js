@@ -4,16 +4,16 @@ window.UK_CONFIG = {
   teamId: '96', // ESPN team id for Kentucky (a sport can override it with its own teamId)
 
   // Every team the app supports. Viewers pick which ones they see on the Settings page;
-  // `on: true` marks the default picks. x / ig are the team's official social accounts.
+  // `on: true` marks the default picks. x / ig / fb are the team's official social accounts.
   // `sec` is ESPN's standings group id for the SEC in that sport. `ukSport` is the sport's id on
   // UKAthletics.com (for official news). `radio` is 'all' when every game is on the UK Sports Network
   // or 'select' when only some are. `weather: true` shows the game-day forecast (outdoor sports).
   sports: [
-    { key: 'mbb', label: "Men's Basketball", short: 'MBB', path: 'basketball/mens-college-basketball', sec: '23', on: true, ukSport: 130, radio: 'all', x: 'KentuckyMBB', ig: 'kentuckymbb' },
-    { key: 'football', label: 'Football', short: 'FB', path: 'football/college-football', sec: '8', on: true, ukSport: 115, radio: 'all', weather: true, x: 'UKFootball', ig: 'ukfootball' },
-    { key: 'baseball', label: 'Baseball', short: 'BSB', path: 'baseball/college-baseball', teamId: '82', sec: '27', on: true, ukSport: 105, radio: 'all', weather: true, x: 'UKBaseball', ig: 'kentuckybaseball' },
-    { key: 'wvb', label: 'Volleyball', short: 'WVB', path: 'volleyball/womens-college-volleyball', sec: '71', on: true, ukSport: 118, radio: 'select', x: 'KentuckyVB', ig: 'kentuckyvolleyball' },
-    { key: 'wbb', label: "Women's Basketball", short: 'WBB', path: 'basketball/womens-college-basketball', sec: '23', on: false, ukSport: 109, radio: 'all', x: 'KentuckyWBB', ig: 'kentuckywbb' },
+    { key: 'mbb', label: "Men's Basketball", short: 'MBB', path: 'basketball/mens-college-basketball', sec: '23', on: true, ukSport: 130, radio: 'all', x: 'KentuckyMBB', fb: 'KentuckyMBB', ig: 'kentuckymbb' },
+    { key: 'football', label: 'Football', short: 'FB', path: 'football/college-football', sec: '8', on: true, ukSport: 115, radio: 'all', weather: true, x: 'UKFootball', fb: 'KentuckyFootball', ig: 'ukfootball' },
+    { key: 'baseball', label: 'Baseball', short: 'BSB', path: 'baseball/college-baseball', teamId: '82', sec: '27', on: true, ukSport: 105, radio: 'all', weather: true, x: 'UKBaseball', fb: 'UKBaseball', ig: 'kentuckybaseball' },
+    { key: 'wvb', label: 'Volleyball', short: 'WVB', path: 'volleyball/womens-college-volleyball', sec: '71', on: true, ukSport: 118, radio: 'select', x: 'KentuckyVB', fb: 'KentuckyVolleyball', ig: 'kentuckyvolleyball' },
+    { key: 'wbb', label: "Women's Basketball", short: 'WBB', path: 'basketball/womens-college-basketball', sec: '23', on: false, ukSport: 109, radio: 'all', x: 'KentuckyWBB', fb: 'KentuckyWBB', ig: 'kentuckywbb' },
   ],
 
   // Championship counts shown on each team page. Update these when Kentucky wins another one.

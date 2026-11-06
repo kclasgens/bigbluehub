@@ -448,6 +448,7 @@ button { font: inherit; }
   color: #fff; font-size: 14px; font-weight: 900;
 }
 .social-link .ico.x { background: #000; }
+.social-link .ico.fb { background: #1877f2; font-family: Helvetica, Arial, sans-serif; font-weight: 800; }
 .social-link .ico.ig { background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888); }
 .social-link .who { display: block; font-size: 12px; font-weight: 600; color: var(--muted); }
 .social-link > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }

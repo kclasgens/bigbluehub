@@ -5,12 +5,16 @@
 // page's menus, sponsor banners or ad code. Only ukathletics.com/news/ pages can be requested.
 //
 //   GET /story?url=https://ukathletics.com/news/2026/11/04/some-story/
+//   GET /news?sport=115   a sport's latest UK stories with photos (UKAthletics.com's own lists
+//                         can take 15-30 seconds, so the relay keeps a copy and refreshes it)
 
 const ALLOWED_ORIGINS = [
   'https://kclasgens.github.io',
   'http://localhost:5173',
 ];
 const CACHE_SECONDS = 3600;
+const NEWS_FRESH_SECONDS = 600; // news lists older than this are refreshed in the background
+const UK_API = 'https://ukathletics.com/wp-json';
 
 export default {
   async fetch(request, env, ctx) {
@@ -23,6 +27,7 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { headers: cors });
 
     const reqUrl = new URL(request.url);
+    if (reqUrl.pathname === '/news') return news(reqUrl, ctx, cors);
     if (reqUrl.pathname !== '/story') return json({ error: 'not found' }, 404, cors);
 
     let target;
@@ -46,6 +51,46 @@ export default {
     return withHeaders(res, cors);
   },
 };
+
+// A sport's news list. A saved copy is answered at once; when it's over ten minutes old the relay
+// also fetches a fresh one in the background for the next visitor.
+async function news(reqUrl, ctx, cors) {
+  const sport = reqUrl.searchParams.get('sport') || '';
+  if (!/^\d{1,6}$/.test(sport)) return json({ error: 'bad sport' }, 400, cors);
+  const cacheKey = new Request(`https://relay.cache/news?sport=${sport}`);
+  const cache = caches.default;
+  const refresh = async () => {
+    const res = json({ items: await newsList(sport), savedAt: Date.now() }, 200, { 'Cache-Control': 'public, max-age=86400' });
+    await cache.put(cacheKey, res.clone());
+    return res;
+  };
+  const hit = await cache.match(cacheKey);
+  if (hit) {
+    const { savedAt } = await hit.clone().json().catch(() => ({}));
+    if (!savedAt || Date.now() - savedAt > NEWS_FRESH_SECONDS * 1000) ctx.waitUntil(refresh().catch(() => {}));
+    return withHeaders(hit, cors);
+  }
+  try {
+    return withHeaders(await refresh(), cors);
+  } catch (e) {
+    return json({ error: String(e.message || e) }, 502, cors);
+  }
+}
+
+async function newsList(sport) {
+  const get = async (url) => {
+    const r = await fetch(url, { headers: { 'User-Agent': 'BigBlueHub-relay/1.0' } });
+    if (!r.ok) throw new Error(`UKAthletics.com returned ${r.status}`);
+    return r.json();
+  };
+  const [posts, ...pages] = await Promise.all([
+    get(`${UK_API}/wp/v2/posts?sport_category=${sport}&per_page=12&_fields=id,date_gmt,link,title,format`),
+    // Photos come from the all-sports list, which covers the newest stories.
+    ...[1, 2, 3].map((page) => get(`${UK_API}/v1/news?per_page=24&page=${page}`).catch(() => ({}))),
+  ]);
+  const photos = new Map(pages.flatMap((p) => p.data || []).map((n) => [n.id, original(n.thumbnail || n.image)]));
+  return posts.map((p) => ({ id: p.id, date_gmt: p.date_gmt, link: p.link, title: p.title?.rendered || '', format: p.format, photo: photos.get(p.id) || null }));
+}
 
 async function extract(html, href) {
   const text = (s) => decode((s || '').replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();

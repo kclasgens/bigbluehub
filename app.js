@@ -29,8 +29,8 @@
 
   // ---------- helpers ----------
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const getJSON = async (url) => {
-    const r = await fetch(url, { cache: 'no-store' });
+  const getJSON = async (url, timeoutMs) => {
+    const r = await fetch(url, { cache: 'no-store', signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined });
     if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
     return r.json();
   };
@@ -522,12 +522,15 @@
         source: 'ESPN', headline: a.headline, text: a.description || '', date: new Date(a.published), href: a.links?.web?.href || '#',
         api: a.links?.api?.self?.href || '', thumb: a.images?.[0]?.url, video: a.type === 'Media',
       })));
-    Promise.allSettled([espnNews, ukNews(sport)]).then(([espn, uk]) => {
+    // Each source is drawn as soon as it arrives, so a slow UKAthletics.com never holds up ESPN's stories.
+    const news = { espn: null, uk: null }; // null = still loading, false = failed
+    const drawNews = () => {
       if (!current()) return;
-      if (espn.status === 'rejected' && uk.status === 'rejected') return fail('#t-news', 'News');
-      const items = [...(espn.value || []), ...(uk.value || [])]
+      if (news.espn === false && news.uk === false) return fail('#t-news', 'News');
+      const items = [...(news.espn || []), ...(news.uk || [])]
         .filter((n) => !BETTING.test(`${n.headline} ${n.text}`))
         .sort((a, b) => b.date - a.date).slice(0, 12);
+      if (!items.length && (news.espn === null || news.uk === null)) return; // wait for the other source
       fill('#t-news', items.length ? `<div class="news">${items.map((n) => `
         <a class="news-item" href="${esc(n.href)}" target="_blank" rel="noopener" ${n.uk ? `data-uk="${esc(n.uk)}"` : `data-api="${esc(n.api)}"`}>
           <span class="news-thumb">${n.thumb ? `<img src="${esc(n.thumb)}" alt="" loading="lazy"${n.full ? ` data-full="${esc(n.full)}"` : ''}>` : '<span class="no-thumb"></span>'}${n.video ? '<span class="play">▶</span>' : n.gallery ? '<span class="play">📷</span>' : ''}</span>
@@ -535,7 +538,9 @@
         </a>`).join('')}</div>` : '<div class="empty">No recent news.</div>');
       // Some UK photos have no small copy; fall back to the full photo.
       view.querySelectorAll('#t-news img[data-full]').forEach((img) => img.addEventListener('error', () => { img.src = img.dataset.full; img.removeAttribute('data-full'); }, { once: true }));
-    }).catch((e) => { console.error(e); fail('#t-news', 'News'); });
+    };
+    espnNews.then((v) => { news.espn = v; }, () => { news.espn = false; }).then(drawNews);
+    ukNews(sport).then((v) => { news.uk = v; }, () => { news.uk = false; }).then(drawNews);
 
     // Roster (+ head coach for the hero).
     getJSON(`${base}/teams/${id}/roster`).then((d) => {
@@ -890,17 +895,25 @@
     getJSON(`${CFG.ukAthletics}/wp-json/v1/news?per_page=24&page=${page}`).catch(() => ({}))))
     .then((pages) => new Map(pages.flatMap((p) => p.data || []).map((n) => [n.id, ukPhoto(n.thumbnail || n.image)]))));
   const ukStories = new Map();
+  // UKAthletics.com can take 15–30 seconds to answer, so the relay keeps a copy of each sport's list.
   async function ukNews(sport) {
     if (!CFG.ukAthletics || !sport.ukSport) return [];
-    const [posts, photos] = await Promise.all([
-      getJSON(`${CFG.ukAthletics}/wp-json/wp/v2/posts?sport_category=${sport.ukSport}&per_page=12&_fields=id,date_gmt,link,title,format`),
-      ukPhotos().catch(() => new Map()),
-    ]);
-    return posts.filter((p) => /^https:\/\/ukathletics\.com\//.test(p.link)).map((p) => {
-      const photo = photos.get(p.id);
+    let list;
+    if (CFG.ukRelay) {
+      try { list = (await getJSON(`${CFG.ukRelay}/news?sport=${sport.ukSport}`, 30e3)).items; } catch { /* ask UK directly */ }
+    }
+    if (!list) {
+      const [posts, photos] = await Promise.all([
+        getJSON(`${CFG.ukAthletics}/wp-json/wp/v2/posts?sport_category=${sport.ukSport}&per_page=12&_fields=id,date_gmt,link,title,format`, 45e3),
+        ukPhotos().catch(() => new Map()),
+      ]);
+      list = posts.map((p) => ({ ...p, title: p.title?.rendered, photo: photos.get(p.id)?.full }));
+    }
+    return list.filter((p) => /^https:\/\/ukathletics\.com\//.test(p.link)).map((p) => {
+      const photo = /^https:\/\/storage\.googleapis\.com\/ukathletics-com\//.test(p.photo || '') ? p.photo : null;
       const story = {
-        uk: String(p.id), source: 'UK Athletics', headline: decodeHtml(p.title?.rendered), text: '',
-        date: new Date(`${p.date_gmt}Z`), href: p.link, thumb: photo?.thumb, full: photo?.full,
+        uk: String(p.id), source: 'UK Athletics', headline: decodeHtml(p.title), text: '',
+        date: new Date(`${p.date_gmt}Z`), href: p.link, thumb: photo?.replace(/(\.\w+)$/, '-150x150$1'), full: photo,
         video: p.format === 'video', gallery: p.format === 'gallery',
       };
       ukStories.set(story.uk, story);

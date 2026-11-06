@@ -408,6 +408,11 @@ button { font: inherit; }
 .reader-body .story-video video { display: block; width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 10px; }
 .reader-body figcaption { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
 .reader-body hr { border: 0; border-top: 1px solid var(--border); margin: 20px 0; }
+.reader-body table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 12px 0; display: block; overflow-x: auto; }
+.reader-body th, .reader-body td { padding: 5px 8px; border-bottom: 1px solid var(--border); text-align: left; }
+.reader-body .story-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.reader-body .story-gallery figure { margin: 0; }
+.reader-body .story-gallery img { aspect-ratio: 3/2; object-fit: cover; }
 .reader-body .reader-source { font-size: 13px; color: var(--muted); border-top: 1px solid var(--border); padding-top: 12px; margin-top: 24px; }
 @media (max-width: 640px) { .reader-body { padding: 16px; font-size: 15.5px; } .reader-body h1 { font-size: 20px; } }
 

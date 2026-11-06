@@ -903,7 +903,43 @@
       return story;
     });
   }
-  function openUkStory(n) {
+  // Full UK stories come through our relay, which returns only the story's text, photos and video.
+  async function openUkStory(n) {
+    if (!CFG.ukRelay) return showUkSummary(n);
+    reader.querySelector('.player-title').textContent = 'UK Athletics';
+    readerBody.innerHTML = '<div class="loading">Loading story…</div>';
+    reader.showModal();
+    readerBody.scrollTop = 0;
+    try {
+      const st = await getJSON(`${CFG.ukRelay}/story?url=${encodeURIComponent(n.href)}`);
+      if (!st.title || !(st.html || st.gallery?.length || st.video)) throw new Error('empty story');
+      const photo = (src, caption) => (/^https:/.test(src || '') ? `<figure><img src="${esc(src)}" alt="" loading="lazy">${caption ? `<figcaption>${esc(caption)}</figcaption>` : ''}</figure>` : '');
+      readerBody.innerHTML = `
+        <h1>${esc(st.title)}</h1>
+        <p class="reader-meta">${esc([st.sport, st.date].filter(Boolean).join(' · '))}</p>
+        ${st.video ? `<figure class="story-video"><video controls preload="none" playsinline poster="${esc(st.video.poster || st.image || '')}"></video></figure>` : st.gallery?.length ? '' : photo(st.image)}
+        ${st.html ? cleanStory(st.html, [], []) : ''}
+        ${st.gallery?.length ? `<div class="story-gallery">${st.gallery.map((g) => photo(g.src, g.caption)).join('')}</div>` : ''}
+        <p class="reader-source">Source: <a href="${esc(n.href)}" target="_blank" rel="noopener">UKAthletics.com</a> (official UK Athletics)</p>`;
+      const v = readerBody.querySelector('.story-video video');
+      if (v && /^https:\/\/cdn\d*\.video\.wmt\.media\//.test(st.video.src)) playHls(v, st.video.src);
+    } catch {
+      showUkSummary(n);
+    }
+  }
+  // UK videos are HLS streams: Safari plays them itself; other browsers use hls.js.
+  let hls = null;
+  function playHls(video, src) {
+    if (video.canPlayType('application/vnd.apple.mpegurl')) { video.src = src; return; }
+    loadScript('https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.15/hls.min.js', () => {
+      if (!window.Hls?.isSupported() || !video.isConnected) return;
+      hls?.destroy();
+      hls = new window.Hls();
+      hls.loadSource(src);
+      hls.attachMedia(video);
+    });
+  }
+  function showUkSummary(n) {
     reader.querySelector('.player-title').textContent = 'UK Athletics';
     const kind = n.video ? 'Watch the video' : n.gallery ? 'See the photo gallery' : 'Read the full story';
     readerBody.innerHTML = `
@@ -912,7 +948,7 @@
       ${n.full ? `<figure><img src="${esc(n.full)}" alt=""></figure>` : ''}
       <p><a class="btn" href="${esc(n.href)}" target="_blank" rel="noopener">${kind} on UKAthletics.com →</a></p>
       <p class="reader-source">Source: <a href="${esc(n.href)}" target="_blank" rel="noopener">UKAthletics.com</a> (official UK Athletics)</p>`;
-    reader.showModal();
+    if (!reader.open) reader.showModal();
     readerBody.scrollTop = 0;
   }
 
@@ -929,9 +965,13 @@
   const readerBody = reader.querySelector('.reader-body');
   reader.querySelector('.player-close').addEventListener('click', () => reader.close());
   reader.addEventListener('click', (e) => { if (e.target === reader) reader.close(); });
-  reader.addEventListener('close', () => readerBody.querySelectorAll('video').forEach((v) => v.pause()));
+  reader.addEventListener('close', () => {
+    readerBody.querySelectorAll('video').forEach((v) => v.pause());
+    hls?.destroy(); hls = null;
+  });
 
-  const SAFE_TAGS = new Set(['P', 'H2', 'H3', 'H4', 'STRONG', 'B', 'EM', 'I', 'A', 'BR', 'HR', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'IMG', 'FIGURE', 'FIGCAPTION', 'VIDEO']);
+  const SAFE_TAGS = new Set(['P', 'H2', 'H3', 'H4', 'STRONG', 'B', 'EM', 'I', 'U', 'SUP', 'SUB', 'SPAN', 'A', 'BR', 'HR', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'IMG', 'FIGURE', 'FIGCAPTION', 'VIDEO',
+    'TABLE', 'THEAD', 'TBODY', 'TR', 'TH', 'TD']);
   const SAFE_ATTRS = ['href', 'src', 'alt', 'poster', 'controls', 'preload', 'playsinline'];
   const videoSrc = (v) => v?.links?.source?.HD?.href || v?.links?.source?.href;
   const videoFigure = (v) => (videoSrc(v) && !BETTING.test(`${v.headline} ${v.caption || ''}`)

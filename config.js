@@ -47,6 +47,9 @@ window.UK_CONFIG = {
 
   // Official UK Athletics news (UKAthletics.com allows other sites to read its news list).
   ukAthletics: 'https://ukathletics.com',
+  // Our Cloudflare relay that returns a UK story's text, photos and video (see relay/worker.js).
+  // Leave it empty and UK stories show their photo with a link to UKAthletics.com instead.
+  ukRelay: '',
 
   // Free live radio: the UK Sports Network streams every broadcast on WLAP 630 through iHeartRadio.
   radio: { label: 'UK Sports Network', station: 'WLAP 630', url: 'https://www.iheart.com/live/newsradio-630-wlap-965/' },

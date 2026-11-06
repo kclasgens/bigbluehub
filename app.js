@@ -857,10 +857,14 @@
     if (listen) { e.preventDefault(); window.open(listen.dataset.listen, '_blank', 'noopener'); return; }
     const btn = e.target.closest('.video[data-src]');
     if (btn) openPlayer(btn.dataset);
-    const story = e.target.closest('.news-item[data-api]');
-    if (story?.dataset.api) { e.preventDefault(); openReader(story.dataset.api, story.href); }
-    const ukStory = e.target.closest('.news-item[data-uk]');
-    if (ukStory && ukStories.has(ukStory.dataset.uk)) { e.preventDefault(); openUkStory(ukStories.get(ukStory.dataset.uk)); }
+    const item = e.target.closest('.news-item');
+    if (item && (item.dataset.api || ukStories.has(item.dataset.uk))) {
+      e.preventDefault();
+      // Remember the whole list so Previous / Next can step through it without closing the viewer.
+      const items = [...item.closest('.news').querySelectorAll('.news-item')];
+      newsList = items.map((el) => ({ api: el.dataset.api, uk: el.dataset.uk, href: el.href, headline: el.querySelector('b')?.textContent || '' }));
+      openNewsAt(items.indexOf(item));
+    }
   });
   view.addEventListener('keydown', (e) => {
     const listen = e.key === 'Enter' && e.target.closest('[data-listen]');
@@ -906,12 +910,10 @@
   // Full UK stories come through our relay, which returns only the story's text, photos and video.
   async function openUkStory(n) {
     if (!CFG.ukRelay) return showUkSummary(n);
-    reader.querySelector('.player-title').textContent = 'UK Athletics';
-    readerBody.innerHTML = '<div class="loading">Loading story…</div>';
-    reader.showModal();
-    readerBody.scrollTop = 0;
+    const token = startReader('UK Athletics');
     try {
       const st = await getJSON(`${CFG.ukRelay}/story?url=${encodeURIComponent(n.href)}`);
+      if (token !== readerToken) return; // the reader moved on to another story
       if (!st.title || !(st.html || st.gallery?.length || st.video)) throw new Error('empty story');
       const photo = (src, caption) => (/^https:/.test(src || '') ? `<figure><img src="${esc(src)}" alt="" loading="lazy">${caption ? `<figcaption>${esc(caption)}</figcaption>` : ''}</figure>` : '');
       readerBody.innerHTML = `
@@ -920,11 +922,12 @@
         ${st.video ? `<figure class="story-video"><video controls preload="none" playsinline poster="${esc(st.video.poster || st.image || '')}"></video></figure>` : st.gallery?.length ? '' : photo(st.image)}
         ${st.html ? cleanStory(st.html, [], []) : ''}
         ${st.gallery?.length ? `<div class="story-gallery">${st.gallery.map((g) => photo(g.src, g.caption)).join('')}</div>` : ''}
-        <p class="reader-source">Source: <a href="${esc(n.href)}" target="_blank" rel="noopener">UKAthletics.com</a> (official UK Athletics)</p>`;
+        <p class="reader-source">Source: <a href="${esc(n.href)}" target="_blank" rel="noopener">UKAthletics.com</a> (official UK Athletics)</p>
+        ${nextStoryLink()}`;
       const v = readerBody.querySelector('.story-video video');
       if (v && /^https:\/\/cdn\d*\.video\.wmt\.media\//.test(st.video.src)) playHls(v, st.video.src);
     } catch {
-      showUkSummary(n);
+      if (token === readerToken) showUkSummary(n);
     }
   }
   // UK videos are HLS streams: Safari plays them itself; other browsers use hls.js.
@@ -947,7 +950,8 @@
       <p class="reader-meta">${esc(n.date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' }))}</p>
       ${n.full ? `<figure><img src="${esc(n.full)}" alt=""></figure>` : ''}
       <p><a class="btn" href="${esc(n.href)}" target="_blank" rel="noopener">${kind} on UKAthletics.com →</a></p>
-      <p class="reader-source">Source: <a href="${esc(n.href)}" target="_blank" rel="noopener">UKAthletics.com</a> (official UK Athletics)</p>`;
+      <p class="reader-source">Source: <a href="${esc(n.href)}" target="_blank" rel="noopener">UKAthletics.com</a> (official UK Athletics)</p>
+      ${nextStoryLink()}`;
     if (!reader.open) reader.showModal();
     readerBody.scrollTop = 0;
   }
@@ -959,15 +963,73 @@
   reader.className = 'player reader';
   reader.innerHTML = `
     <div class="player-head"><span class="player-title">News</span>
+      <div class="reader-nav">
+        <button class="nav-btn" data-step="-1" aria-label="Previous story">‹<span> Previous</span></button>
+        <span class="reader-count"></span>
+        <button class="nav-btn" data-step="1" aria-label="Next story"><span>Next </span>›</button>
+      </div>
       <button class="player-close" aria-label="Close story">✕</button></div>
     <article class="reader-body"></article>`;
   document.body.appendChild(reader);
   const readerBody = reader.querySelector('.reader-body');
   reader.querySelector('.player-close').addEventListener('click', () => reader.close());
+
+  // Previous / Next: step through the News card's stories without leaving the viewer.
+  let newsList = [];
+  let newsIndex = -1;
+  let readerToken = 0;
+  function openNewsAt(i) {
+    const n = newsList[i];
+    if (!n) return;
+    newsIndex = i;
+    if (n.uk && ukStories.has(n.uk)) openUkStory(ukStories.get(n.uk));
+    else if (n.api) openReader(n.api, n.href);
+  }
+  const step = (d) => openNewsAt(newsIndex + d);
+  // Shows the viewer with a loading message; returns a token so late answers for an earlier story are ignored.
+  function startReader(title) {
+    reader.querySelector('.player-title').textContent = title;
+    readerBody.querySelectorAll('video').forEach((v) => v.pause());
+    hls?.destroy(); hls = null;
+    readerBody.innerHTML = '<div class="loading">Loading story…</div>';
+    const many = newsList.length > 1 && newsIndex >= 0;
+    reader.querySelector('.reader-nav').hidden = !many;
+    if (many) {
+      reader.querySelector('.reader-count').textContent = `${newsIndex + 1} of ${newsList.length}`;
+      reader.querySelector('[data-step="-1"]').disabled = newsIndex <= 0;
+      reader.querySelector('[data-step="1"]').disabled = newsIndex >= newsList.length - 1;
+    }
+    if (!reader.open) reader.showModal();
+    readerBody.scrollTop = 0;
+    return ++readerToken;
+  }
+  const nextStoryLink = () => {
+    const n = newsList[newsIndex + 1];
+    return n && newsIndex >= 0 ? `<button class="next-story" data-step="1"><span class="small muted">Next story</span><b>${esc(n.headline)}</b><span class="arrow">›</span></button>` : '';
+  };
+  reader.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-step]');
+    if (b && !b.disabled) step(Number(b.dataset.step));
+  });
+  reader.addEventListener('keydown', (e) => {
+    if (e.target.closest('video')) return; // arrow keys seek inside a playing video
+    if (e.key === 'ArrowRight') step(1);
+    else if (e.key === 'ArrowLeft') step(-1);
+  });
+  // Swipe left / right on phones and tablets.
+  let touchX = null, touchY = null;
+  reader.addEventListener('touchstart', (e) => { touchX = e.touches[0].clientX; touchY = e.touches[0].clientY; }, { passive: true });
+  reader.addEventListener('touchend', (e) => {
+    if (touchX == null) return;
+    const dx = e.changedTouches[0].clientX - touchX, dy = e.changedTouches[0].clientY - touchY;
+    touchX = null;
+    if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 2 && !e.target.closest('table, video')) step(dx < 0 ? 1 : -1);
+  }, { passive: true });
   reader.addEventListener('click', (e) => { if (e.target === reader) reader.close(); });
   reader.addEventListener('close', () => {
     readerBody.querySelectorAll('video').forEach((v) => v.pause());
     hls?.destroy(); hls = null;
+    newsList = []; newsIndex = -1; readerToken++;
   });
 
   const SAFE_TAGS = new Set(['P', 'H2', 'H3', 'H4', 'STRONG', 'B', 'EM', 'I', 'U', 'SUP', 'SUB', 'SPAN', 'A', 'BR', 'HR', 'UL', 'OL', 'LI', 'BLOCKQUOTE', 'IMG', 'FIGURE', 'FIGCAPTION', 'VIDEO',
@@ -1007,16 +1069,20 @@
   }
 
   async function openReader(api, webHref) {
-    readerBody.innerHTML = '<div class="loading">Loading story…</div>';
-    reader.showModal();
-    readerBody.scrollTop = 0;
+    const token = startReader('News');
     try {
       const data = await getJSON(api);
-      // Some "news" items are just video clips: hand those to the video player.
+      if (token !== readerToken) return; // the reader moved on to another story
+      // Some "news" items are just video clips: play those right in the viewer.
       const clip = !data.headlines && data.videos?.[0];
       if (clip && videoSrc(clip)) {
-        reader.close();
-        openPlayer({ src: videoSrc(clip), title: clip.headline, poster: clip.thumbnail });
+        reader.querySelector('.player-title').textContent = 'Video';
+        readerBody.innerHTML = `
+          <h1>${esc(clip.headline || '')}</h1>
+          <figure class="story-video"><video controls autoplay playsinline src="${esc(videoSrc(clip))}" poster="${esc(clip.thumbnail || '')}"></video></figure>
+          ${clip.description ? `<p>${esc(clip.description)}</p>` : ''}
+          <p class="reader-source">Source: <a href="${esc(webHref)}" target="_blank" rel="noopener">ESPN.com</a></p>
+          ${nextStoryLink()}`;
         return;
       }
       const h = data.headlines?.[0];
@@ -1033,9 +1099,11 @@
         ${leadVideo}
         ${lead?.url ? `<figure><img src="${esc(lead.url)}" alt="">${lead.caption ? `<figcaption>${esc(lead.caption)}</figcaption>` : ''}</figure>` : ''}
         ${cleanStory(h.story, images, videos)}
-        <p class="reader-source">Source: <a href="${esc(webHref)}" target="_blank" rel="noopener">ESPN.com</a></p>`;
+        <p class="reader-source">Source: <a href="${esc(webHref)}" target="_blank" rel="noopener">ESPN.com</a></p>
+        ${nextStoryLink()}`;
     } catch {
-      readerBody.innerHTML = `<p class="empty">This story can't be shown here. <a href="${esc(webHref)}" target="_blank" rel="noopener">Open it on ESPN.com →</a></p>`;
+      if (token !== readerToken) return;
+      readerBody.innerHTML = `<p class="empty">This story can't be shown here. <a href="${esc(webHref)}" target="_blank" rel="noopener">Open it on ESPN.com →</a></p>${nextStoryLink()}`;
     }
   }
 

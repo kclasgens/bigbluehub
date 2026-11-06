@@ -52,10 +52,12 @@
   const teamPhoto = (sportKey) => (photoCache[sportKey] ||= getJSON(`${API}${SPORTS[sportKey].path}/news?team=${ukId(sportKey)}&limit=15`)
     .then((d) => (d.articles || []).find((a) => a.images?.[0]?.url && !BETTING.test(`${a.headline} ${a.description || ''}`))?.images[0].url)
     .catch(() => null));
-  const VENUE_PHOTOS = { // ESPN only has stadium photos for some venues
+  const VENUE_PHOTOS = { // wide shots of a packed Kroger Field and Rupp Arena
     football: 'https://a.espncdn.com/i/venues/college-football/day/3683.jpg',
     mbb: 'https://a.espncdn.com/i/venues/mens-college-basketball/day/251.jpg',
   };
+  // Banner photo for a sport: its home venue when we have one, else the latest news photo.
+  const bannerPhoto = (sportKey) => (VENUE_PHOTOS[sportKey] ? Promise.resolve(VENUE_PHOTOS[sportKey]) : teamPhoto(sportKey));
   const cleanVideos = (vids) => (vids || []).filter((v) => !BETTING.test(`${v.headline} ${v.description || ''} ${v.caption || ''}`));
   const sameDay =(a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
   const fmtDay = (d) => d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
@@ -221,16 +223,6 @@
   }
 
   // ---------- pages ----------
-  const prefs = {
-    get sportFilter() { try { return localStorage.getItem('sportFilter') || 'all'; } catch { return 'all'; } },
-    set sportFilter(v) { try { localStorage.setItem('sportFilter', v); } catch { /* ignore */ } },
-  };
-
-  function sportChips(active) {
-    const opts = [{ key: 'all', label: 'All' }, ...mySports()];
-    return `<div class="chips">${opts.map((o) => `<button class="chip ${o.key === active ? 'active' : ''}" data-sport="${o.key}">${esc(o.short || o.label)}</button>`).join('')}</div>`;
-  }
-
   async function homePage() {
     view.innerHTML = '<div class="loading">Loading schedule…</div>';
     renderSocial();
@@ -258,7 +250,7 @@
         ${data.failed ? `<div class="error small">${data.failed} sport schedule(s) failed to load.</div>` : ''}
       `;
       bindRowLinks(view);
-      if (featured) teamPhoto(featured.sport).then((url) => setPhoto(view.querySelector('.home-banner'), url || VENUE_PHOTOS[featured.sport]));
+      if (featured) bannerPhoto(featured.sport).then((url) => setPhoto(view.querySelector('.home-banner'), url));
     };
     draw();
 
@@ -266,30 +258,6 @@
     const tick = async () => { if (await refreshLive(data.games)) draw(); };
     tick();
     timers.push(setInterval(tick, 30e3));
-  }
-
-  async function schedulePage() {
-    view.innerHTML = '<div class="loading">Loading schedule…</div>';
-    renderSocial();
-    let data;
-    try { data = await loadSchedules(); } catch (e) { view.innerHTML = `<div class="error">Couldn't load schedule: ${esc(e.message)}</div>`; return; }
-    const draw = () => {
-      const f = mySports().some((s) => s.key === prefs.sportFilter) ? prefs.sportFilter : 'all';
-      const games = data.games.filter((g) => f === 'all' || g.sport === f);
-      const record = (key) => {
-        const gs = data.games.filter((g) => g.sport === key && g.result);
-        return `${gs.filter((g) => g.result === 'W').length}-${gs.filter((g) => g.result === 'L').length}`;
-      };
-      view.innerHTML = `
-        <section class="card">
-          <h2>Season schedule ${sportChips(f)}</h2>
-          <p class="small muted" style="margin-top:-4px">${mySports().map((s) => `${esc(s.label)}: <b>${record(s.key)}</b>`).join(' · ')}</p>
-          ${scheduleTable(games)}
-        </section>`;
-      view.querySelectorAll('.chip').forEach((b) => b.addEventListener('click', () => { prefs.sportFilter = b.dataset.sport; draw(); }));
-      bindRowLinks(view);
-    };
-    draw();
   }
 
   function settingsPage() {
@@ -300,7 +268,7 @@
         <section class="card settings">
           <h2>Settings</h2>
           <h3>My teams</h3>
-          <p class="small muted">Choose the Kentucky teams you want on your home page, schedule and social links.</p>
+          <p class="small muted">Choose the Kentucky teams you want on your home page and social links.</p>
           <div class="team-picks">${CFG.sports.map((s) => `
             <label class="team-pick">
               <input type="checkbox" value="${esc(s.key)}" ${on.includes(s.key) ? 'checked' : ''}>
@@ -354,7 +322,7 @@
         </div>
       </div>`;
 
-    teamPhoto(sport.key).then((url) => current() && setPhoto(view.querySelector('#t-hero'), url || VENUE_PHOTOS[sport.key]));
+    bannerPhoto(sport.key).then((url) => current() && setPhoto(view.querySelector('#t-hero'), url));
     const fill = (sel, html) => { const el = view.querySelector(sel); if (el) el.innerHTML = el.querySelector('h2').outerHTML + html; };
     const fail = (sel, what) => fill(sel, `<div class="empty">${what} isn't available right now.</div>`);
     const current = () => location.hash === `#/team/${sport.key}`; // ignore late responses after navigating away
@@ -912,11 +880,10 @@
   function route() {
     clearTimers();
     const parts = location.hash.replace(/^#\/?/, '').split('/');
-    document.querySelectorAll('.topnav a').forEach((a) => a.classList.toggle('active', a.getAttribute('href') === `#/${['schedule', 'settings', 'team'].includes(parts[0]) ? parts[0] : ''}` && parts[0] !== 'game'));
+    document.querySelectorAll('.topnav a').forEach((a) => a.classList.toggle('active', a.getAttribute('href') === `#/${['settings', 'team'].includes(parts[0]) ? parts[0] : ''}` && parts[0] !== 'game'));
     window.scrollTo(0, 0);
     social.hidden = parts[0] !== ''; // "Follow the Cats" appears on the home page only
     if (parts[0] === 'game') gamePage(parts[1], parts[2]);
-    else if (parts[0] === 'schedule') schedulePage();
     else if (parts[0] === 'settings') settingsPage();
     else if (parts[0] === 'team') teamPage(parts[1]);
     else homePage();

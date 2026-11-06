@@ -41,9 +41,9 @@
     return r && Number(r) <= 25 ? `#${r} ` : '';
   };
   const BETTING = /\b(bet|bets|betting|odds|spread|over\/under|parlay|wager|sportsbook|picks?|prop|moneyline|fantasy|draftkings|fanduel)\b/i;
-  // Photos: only ESPN-hosted https images are used as banner backgrounds.
+  // Photos: only ESPN-hosted https images and the app's own img/ folder are used as banner backgrounds.
   const setPhoto = (el, url) => {
-    if (!el || !/^https:\/\/[a-z0-9.-]*espncdn\.com\//i.test(url || '')) return;
+    if (!el || !/^(https:\/\/[a-z0-9.-]*espncdn\.com\/|img\/)/i.test(url || '')) return;
     el.style.setProperty('--photo', `url("${url.replace(/["\\]/g, '')}")`);
     el.classList.add('has-photo');
   };
@@ -52,9 +52,14 @@
   const teamPhoto = (sportKey) => (photoCache[sportKey] ||= getJSON(`${API}${SPORTS[sportKey].path}/news?team=${ukId(sportKey)}&limit=15`)
     .then((d) => (d.articles || []).find((a) => a.images?.[0]?.url && !BETTING.test(`${a.headline} ${a.description || ''}`))?.images[0].url)
     .catch(() => null));
-  const VENUE_PHOTOS = { // wide shots of a packed Kroger Field and Rupp Arena
+  const VENUE_PHOTOS = { // wide shots of packed home venues
     football: 'https://a.espncdn.com/i/venues/college-football/day/3683.jpg',
     mbb: 'https://a.espncdn.com/i/venues/mens-college-basketball/day/251.jpg',
+    baseball: 'img/kentucky-proud-park.jpg',
+  };
+  // Credits required by the licenses of photos in img/.
+  const PHOTO_CREDITS = {
+    baseball: { text: 'Photo: PCN02WPS, CC BY-SA 4.0', href: 'https://commons.wikimedia.org/wiki/File:Kentucky_Proud_Park,_UK_vs._Arkansas,_May_4,_2024.jpg' },
   };
   // Banner photo for a sport: its home venue when we have one, else the latest news photo.
   const bannerPhoto = (sportKey) => (VENUE_PHOTOS[sportKey] ? Promise.resolve(VENUE_PHOTOS[sportKey]) : teamPhoto(sportKey));
@@ -291,6 +296,17 @@
   // ---------- team pages ----------
   const teamState = { poll: null };
 
+  function titlesCard(sportKey) {
+    const titles = CFG.titles?.[sportKey];
+    if (!titles?.length) return '';
+    return `<section class="card"><h2>Championships</h2>
+      <ul class="titles">${titles.map((t) => `
+        <li><span class="count${t.count ? '' : ' zero'}">${Number(t.count) || 0}</span><span><b>${esc(t.label)}</b>${t.note ? `<span class="small muted">${esc(t.note)}</span>` : ''}</span></li>`).join('')}
+      </ul>
+      ${CFG.titlesAsOf ? `<p class="small muted titles-asof">${esc(CFG.titlesAsOf)}</p>` : ''}
+    </section>`;
+  }
+
   function teamPage(sportKey) {
     const mine = mySports();
     const sport = SPORTS[sportKey] || mine[0];
@@ -304,6 +320,7 @@
       <section class="team-hero" id="t-hero">
         <img src="https://a.espncdn.com/i/teamlogos/ncaa/500-dark/96.png" alt="" width="84" height="84">
         <div><h1>Kentucky ${esc(sport.label)}</h1><div class="hero-meta">Loading…</div></div>
+        ${PHOTO_CREDITS[sport.key] ? `<a class="photo-credit" href="${esc(PHOTO_CREDITS[sport.key].href)}" target="_blank" rel="noopener">${esc(PHOTO_CREDITS[sport.key].text)}</a>` : ''}
       </section>
       <div class="team-grid">
         <div>
@@ -313,6 +330,7 @@
         </div>
         <div>
           <section class="card" id="t-polls"><h2>Rankings</h2><div class="loading">Loading…</div></section>
+          ${titlesCard(sport.key)}
           <section class="card" id="t-news"><h2>News</h2><div class="loading">Loading…</div></section>
           <section class="card" id="t-roster"><h2>Roster</h2><div class="loading">Loading…</div></section>
           <section class="card"><h2>Follow</h2><div class="social-grid one-col">

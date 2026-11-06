@@ -10,9 +10,38 @@ window.UK_CONFIG = {
     { key: 'mbb', label: "Men's Basketball", short: 'MBB', path: 'basketball/mens-college-basketball', sec: '23', on: true, x: 'KentuckyMBB', ig: 'kentuckymbb' },
     { key: 'football', label: 'Football', short: 'FB', path: 'football/college-football', sec: '8', on: true, x: 'UKFootball', ig: 'ukfootball' },
     { key: 'baseball', label: 'Baseball', short: 'BSB', path: 'baseball/college-baseball', teamId: '82', sec: '27', on: true, x: 'UKBaseball', ig: 'kentuckybaseball' },
-    { key: 'wvb', label: "Women's Volleyball", short: 'WVB', path: 'volleyball/womens-college-volleyball', sec: '71', on: true, x: 'KentuckyVB', ig: 'kentuckyvolleyball' },
+    { key: 'wvb', label: 'Volleyball', short: 'WVB', path: 'volleyball/womens-college-volleyball', sec: '71', on: true, x: 'KentuckyVB', ig: 'kentuckyvolleyball' },
     { key: 'wbb', label: "Women's Basketball", short: 'WBB', path: 'basketball/womens-college-basketball', sec: '23', on: false, x: 'KentuckyWBB', ig: 'kentuckywbb' },
   ],
+
+  // Championship counts shown on each team page. Update these when Kentucky wins another one.
+  titlesAsOf: 'Through the 2025–26 seasons',
+  titles: {
+    mbb: [
+      { label: 'NCAA championships', count: 8, note: '1948, 1949, 1951, 1958, 1978, 1996, 1998, 2012' },
+      { label: 'SEC regular-season titles', count: 49, note: 'Most recent: 2020' },
+      { label: 'SEC tournament titles', count: 32, note: 'Most recent: 2018' },
+    ],
+    football: [
+      { label: 'National championships', count: 1, note: '1950 (claimed; college football has no official NCAA title)' },
+      { label: 'SEC championships', count: 2, note: '1950, 1976' },
+    ],
+    baseball: [
+      { label: 'NCAA championships', count: 0 },
+      { label: 'SEC regular-season titles', count: 2, note: '2006, 2024' },
+      { label: 'SEC tournament titles', count: 0 },
+    ],
+    wvb: [
+      { label: 'NCAA championships', count: 1, note: '2020 (played in spring 2021)' },
+      { label: 'SEC regular-season titles', count: 14, note: '1979, 1980, 1983, 1987, 1988, 2017–2025' },
+      { label: 'SEC tournament titles', count: 6, note: 'Most recent: 2025' },
+    ],
+    wbb: [
+      { label: 'NCAA championships', count: 0 },
+      { label: 'SEC regular-season titles', count: 1, note: '2012' },
+      { label: 'SEC tournament titles', count: 2, note: '1982, 2022' },
+    ],
+  },
 
   // Department-wide accounts, always shown alongside the chosen teams' accounts.
   xHandles: ['UKAthletics'],

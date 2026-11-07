@@ -88,6 +88,7 @@
       timeValid: ev.timeValid !== false && comp.timeValid !== false,
       neutral: !!comp.neutralSite,
       home: uk.homeAway === 'home',
+      ukTeam: uk.team || {},
       opp: opp?.team || {},
       oppRank: rankOf(opp),
       venue: comp.venue?.fullName || '',
@@ -95,6 +96,7 @@
       networks,
       state: status.state || 'pre', // pre | in | post
       detail: status.shortDetail || status.detail || '',
+      clock: liveClock(status, sportKey),
       completed: !!status.completed,
       ukScore, oppScore,
       result: status.completed && ukScore != null ? (uk.winner ? 'W' : 'L') : '',
@@ -116,6 +118,12 @@
     return scheduleCache;
   }
 
+  // Where a live game stands, e.g. "2nd Half · 8:12", "Halftime", "Top 5th", "End of 3rd Quarter".
+  function liveClock(st, sportKey) {
+    const t = (st.detail || st.shortDetail || '').replace(/^(\d+:\d+) - (.+)$/, '$2 · $1');
+    return sportKey === 'wvb' && /^\d+(st|nd|rd|th)$/.test(t) ? `${t} Set` : t; // volleyball says just "2nd"
+  }
+
   // Refreshes status/score for live (or about-to-start) games via the lightweight summary header.
   async function refreshLive(games) {
     const now = Date.now();
@@ -128,7 +136,7 @@
         const opp = comp.competitors.find((c) => c !== uk);
         const st = comp.status.type;
         Object.assign(g, {
-          state: st.state, detail: st.shortDetail || st.detail, completed: st.completed,
+          state: st.state, detail: st.shortDetail || st.detail, clock: liveClock(st, g.sport), completed: st.completed,
           ukScore: scoreOf(uk), oppScore: scoreOf(opp),
           result: st.completed ? (uk.winner ? 'W' : 'L') : '',
         });
@@ -209,7 +217,7 @@
 
   // ---------- components ----------
   function statusLine(g) {
-    if (g.state === 'in') return `<span class="live-dot">LIVE</span> <span class="small">${esc(g.detail)}</span>`;
+    if (g.state === 'in') return `<span class="live-dot">LIVE</span>${g.ukScore != null ? ` <span class="score">${esc(g.ukScore)}-${esc(g.oppScore)}</span>` : ''} <span class="small">${esc(g.clock || g.detail)}</span>`;
     if (g.state === 'post') {
       if (!g.result) return `<span class="small muted">${esc(g.detail)}</span>`;
       return `<span class="result-${g.result}">${g.result}</span> <span class="score">${esc(g.ukScore)}-${esc(g.oppScore)}</span>`;
@@ -217,15 +225,27 @@
     return `<span class="small"><b>${g.timeValid ? esc(fmtTime(g.date)) : 'TBA'}</b></span>`;
   }
 
+  // Two-line live score (away team on top, as on a TV score bug).
+  function liveScore(g) {
+    const uk = { team: g.ukTeam, name: 'Kentucky', score: g.ukScore, uk: true };
+    const opp = { team: g.opp, name: `${g.oppRank}${g.opp.shortDisplayName || g.opp.displayName || ''}`, score: g.oppScore };
+    const rows = g.home ? [opp, uk] : [uk, opp];
+    const lead = Number(uk.score) > Number(opp.score) ? uk : Number(opp.score) > Number(uk.score) ? opp : null;
+    return `<div class="live-score">${rows.map((r) => `
+      <div class="ls-row${r === lead ? ' lead' : ''}${r.uk ? ' uk' : ''}"><img src="${esc(logoOf(r.team))}" alt="" loading="lazy"><span class="ls-name">${esc(r.name)}</span><span class="ls-pts">${esc(r.score ?? '–')}</span></div>`).join('')}
+      <div class="ls-clock">${esc(g.clock || g.detail)}</div></div>`;
+  }
+
   function gameCard(g) {
     const s = SPORTS[g.sport];
+    const live = g.state === 'in';
     return `
-      <a class="gcard" href="#/game/${g.sport}/${g.id}">
-        <div class="row1"><span class="tag ${s.short}">${s.short}</span>${statusLine(g)}</div>
-        <div class="opp">
+      <a class="gcard${live ? ' live' : ''}" href="#/game/${g.sport}/${g.id}">
+        <div class="row1"><span class="tag ${s.short}">${s.short}</span>${live ? '<span class="live-dot">LIVE</span>' : statusLine(g)}</div>
+        ${live ? liveScore(g) : `<div class="opp">
           <img src="${esc(logoOf(g.opp))}" alt="" loading="lazy">
           <div><span class="va">${whereText(g)}</span> ${esc(g.oppRank)}${esc(g.opp.shortDisplayName || g.opp.displayName)}</div>
-        </div>
+        </div>`}
         <div class="meta">
           <div>📍 ${esc(g.venue)}${g.city ? `, ${esc(g.city)}` : ''}</div>
           <div>📺 <b>${esc(tvText(g))}</b></div>
@@ -252,8 +272,8 @@
   // Big photo banner for the next (or live) game on the home page.
   function homeBanner(g) {
     const s = SPORTS[g.sport];
-    const when = g.state === 'in' ? `<span class="live-dot" style="color:#fff">LIVE</span> ${esc(g.detail)}`
-      : `${esc(g.date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }))} · ${g.timeValid ? esc(fmtTime(g.date)) : 'Time TBA'}`;
+    if (g.state === 'in') return liveBanner(g);
+    const when = `${esc(g.date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }))} · ${g.timeValid ? esc(fmtTime(g.date)) : 'Time TBA'}`;
     return `
       <section class="home-banner">
         <div>
@@ -265,6 +285,25 @@
           <div class="banner-btns"><a class="btn" href="#/game/${g.sport}/${g.id}">${g.state === 'in' ? 'Follow live' : 'Game preview'} →</a>${listenLink(g, 'btn ghost')}</div>
         </div>
         <img class="opp-logo" src="${esc(logoOf(g.opp))}" alt="">
+      </section>`;
+  }
+
+  // The home banner while Kentucky is playing: big score and game clock.
+  function liveBanner(g) {
+    const s = SPORTS[g.sport];
+    const side = (team, name, score) => `
+      <div class="lb-team"><img src="${esc(logoOf(team))}" alt=""><span class="lb-name">${esc(name)}</span><span class="lb-pts">${esc(score ?? '–')}</span></div>`;
+    const uk = side(g.ukTeam, 'Kentucky', g.ukScore);
+    const opp = side(g.opp, `${g.oppRank}${g.opp.shortDisplayName || g.opp.displayName || ''}`, g.oppScore);
+    return `
+      <section class="home-banner live">
+        <div class="lb-main">
+          <div class="eyebrow"><span class="live-pill">LIVE</span> Kentucky ${esc(s.label)}</div>
+          <div class="lb-score">${g.home ? opp + uk : uk + opp}</div>
+          <div class="lb-clock">${esc(g.clock || g.detail)}</div>
+          <div class="when small">📺 ${esc(tvText(g))}${g.venue ? ` · 📍 ${esc(g.venue)}` : ''}</div>
+          <div class="banner-btns"><a class="btn" href="#/game/${g.sport}/${g.id}">Follow live →</a>${listenLink(g, 'btn ghost')}</div>
+        </div>
       </section>`;
   }
 
@@ -426,10 +465,17 @@
       if (!current()) return;
       const games = d.events.map((e) => normalize(e, sport.key)).sort((a, b) => a.date - b.date);
       const next = games.find((g) => g.state !== 'post');
-      fill('#t-next', next ? `<div class="next-wrap">${gameCard(next)}</div>` : '<div class="empty">No upcoming games scheduled yet.</div>');
-      fill('#t-schedule', scheduleTable(games));
-      bindRowLinks(view.querySelector('#t-schedule'));
-      fillWeather(view, games);
+      const drawGames = () => {
+        if (!current()) return;
+        view.querySelector('#t-next h2').textContent = next?.state === 'in' ? 'Live now' : 'Up next';
+        fill('#t-next', next ? `<div class="next-wrap">${gameCard(next)}</div>` : '<div class="empty">No upcoming games scheduled yet.</div>');
+        fill('#t-schedule', scheduleTable(games));
+        bindRowLinks(view.querySelector('#t-schedule'));
+        fillWeather(view, games);
+      };
+      drawGames();
+      // Keep a live (or about-to-start) game's score fresh while this page is open.
+      if (next) timers.push(setInterval(async () => { if (current() && await refreshLive([next])) drawGames(); }, 30e3));
       if (!heroBits.record) {
         const w = games.filter((g) => g.result === 'W').length, l = games.filter((g) => g.result === 'L').length;
         if (w + l) { heroBits.record = `${w}-${l}`; drawHero(); }

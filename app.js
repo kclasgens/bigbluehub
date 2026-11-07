@@ -236,12 +236,15 @@
       <div class="ls-clock">${esc(g.clock || g.detail)}</div></div>`;
   }
 
+  // Sport label on game cards and schedule rows: the sport's emoji, named for screen readers.
+  const sportTag = (s) => `<span class="tag emoji ${s.short}" role="img" aria-label="${esc(s.label)}" title="${esc(s.label)}">${esc(s.emoji || s.short)}</span>`;
+
   function gameCard(g) {
     const s = SPORTS[g.sport];
     const live = g.state === 'in';
     return `
       <a class="gcard${live ? ' live' : ''}" href="#/game/${g.sport}/${g.id}">
-        <div class="row1"><span class="tag ${s.short}">${s.short}</span>${live ? '<span class="live-dot">LIVE</span>' : statusLine(g)}</div>
+        <div class="row1">${sportTag(s)}${live ? '<span class="live-dot">LIVE</span>' : statusLine(g)}</div>
         ${live ? liveScore(g) : `<div class="opp">
           <img src="${esc(logoOf(g.opp))}" alt="" loading="lazy">
           <div><span class="va">${whereText(g)}</span> ${esc(g.oppRank)}${esc(g.opp.shortDisplayName || g.opp.displayName)}</div>
@@ -313,7 +316,7 @@
       const s = SPORTS[g.sport];
       return `
         <tr data-href="#/game/${g.sport}/${g.id}">
-          <td class="when"><span class="tag ${s.short}">${s.short}</span><br><span class="small">${esc(fmtDay(g.date))}</span></td>
+          <td class="when">${sportTag(s)}<br><span class="small">${esc(fmtDay(g.date))}</span></td>
           <td><div class="oppcell"><img src="${esc(logoOf(g.opp))}" alt="" loading="lazy">
             <span><span class="muted small">${whereText(g)}</span> ${esc(g.oppRank)}${esc(g.opp.shortDisplayName || g.opp.displayName)}</span></div></td>
           <td class="venue-col small muted">${esc(g.venue)}</td>
@@ -1128,10 +1131,18 @@
     return doc.body.firstChild.innerHTML;
   }
 
+  // ESPN's content servers sometimes hand back a saved copy that's missing the header browsers need
+  // to let other sites read it. When that happens, ask again with a one-off query so a fresh copy comes back.
+  async function getEspnContent(url) {
+    try { return await getJSON(url); } catch {
+      return getJSON(`${url}${url.includes('?') ? '&' : '?'}fresh=${Date.now()}`);
+    }
+  }
+
   async function openReader(api, webHref) {
     const token = startReader('News');
     try {
-      const data = await getJSON(api);
+      const data = await getEspnContent(api);
       if (token !== readerToken) return; // the reader moved on to another story
       // Some "news" items are just video clips: play those right in the viewer.
       const clip = !data.headlines && data.videos?.[0];

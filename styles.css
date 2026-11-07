@@ -188,6 +188,7 @@ button { font: inherit; }
   display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .04em;
   padding: 2px 7px; border-radius: 6px; background: var(--surface-2); color: var(--muted);
 }
+.tag.emoji { font-size: 16px; line-height: 1; padding: 3px 6px; letter-spacing: 0; }
 .tag.FB { background: #e5ecff; color: #0033a0; }
 .tag.MBB { background: #e3f3ff; color: #005a9c; }
 .tag.WBB { background: #f0e8ff; color: #5b2bb5; }

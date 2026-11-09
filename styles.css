@@ -245,14 +245,14 @@ button { font: inherit; }
 .gcard .opp .va { color: var(--muted); font-weight: 600; font-size: 12px; }
 .gcard .meta { font-size: 12px; color: var(--muted); margin-top: 6px; display: grid; gap: 2px; }
 .gcard .wx b { color: var(--text); }
-.gcard .acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.gcard .act {
+.acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.act {
   display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px; border-radius: 999px; white-space: nowrap;
   font-size: 12px; font-weight: 700; color: var(--uk-blue); background: color-mix(in srgb, var(--uk-blue) 10%, transparent);
 }
-.gcard .act.primary { background: var(--live); color: #fff; }
-.gcard .act:hover { background: var(--uk-blue); color: #fff; }
-.gcard .act.primary:hover { background: color-mix(in srgb, var(--live) 85%, #000); }
+.act.primary { background: var(--live); color: #fff; }
+.act:hover { background: var(--uk-blue); color: #fff; }
+.act.primary:hover { background: color-mix(in srgb, var(--live) 85%, #000); }
 .wx-line { margin-top: 10px; font-size: 14px; }
 .wx-line .wx { display: inline; }
 .gcard .meta b { color: var(--text); font-weight: 600; }
@@ -316,6 +316,7 @@ button { font: inherit; }
 .linescore td:last-child { font-weight: 800; }
 
 .watch-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.watch-row .acts { margin-top: 0; }
 .btn {
   display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 10px;
   background: var(--uk-blue); color: #fff; font-weight: 700; font-size: 14px; border: 0; cursor: pointer;
@@ -504,7 +505,7 @@ button { font: inherit; }
 .card > h2::after {
   content: ""; position: absolute; left: 0; top: 2px; bottom: 2px; width: 4px; border-radius: 2px; background: var(--uk-blue);
 }
-@media (prefers-color-scheme: dark) { .card > h2::after { background: var(--uk-accent); } .titles .count, .news-item .src.uk, .gcard .act:not(.primary) { color: var(--uk-accent); } .gcard .act:hover { color: #fff; } }
+@media (prefers-color-scheme: dark) { .card > h2::after { background: var(--uk-accent); } .titles .count, .news-item .src.uk, .act:not(.primary) { color: var(--uk-accent); } .act:hover { color: #fff; } }
 
 /* Roster headshots */
 .roster-list li { grid-template-columns: 30px 40px 1fr; align-items: center; }

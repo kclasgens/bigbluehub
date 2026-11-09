@@ -172,11 +172,18 @@
     const page = g.state === 'in'
       ? '<span class="act primary">📡 Follow live</span>'
       : '<span class="act">📋 Preview</span>';
+    return `<div class="acts">${page}${serviceActions(g, 'span')}</div>`;
+  };
+  // 📺 Watch and 🎧 Listen buttons. Inside a game card they're spans (the card is already a link);
+  // elsewhere they're ordinary links.
+  const serviceActions = (g, tag = 'a') => {
+    if (g.state === 'post') return '';
+    const btn = (href, title, label) => (tag === 'a'
+      ? `<a class="act" href="${esc(href)}" target="_blank" rel="noopener" title="${esc(title)}">${label}</a>`
+      : `<span class="act" role="link" tabindex="0" data-open="${esc(href)}" title="${esc(title)}">${label}</span>`);
     const tv = watchLinks(g.networks)[0];
-    const watch = tv ? `<span class="act" role="link" tabindex="0" data-open="${esc(tv.href)}" title="${esc(tv.label)}">📺 Watch</span>` : '';
     const r = radioFor(g);
-    const listen = r ? `<span class="act" role="link" tabindex="0" data-open="${esc(r.url)}" title="${esc(listenTitle(r))}">🎧 Listen</span>` : '';
-    return `<div class="acts">${page}${watch}${listen}</div>`;
+    return (tv ? btn(tv.href, tv.label, '📺 Watch') : '') + (r ? btn(r.url, listenTitle(r), '🎧 Listen') : '');
   };
   const listenLink = (g, cls = 'listen') => {
     const r = radioFor(g);
@@ -634,8 +641,9 @@
     const networks = (comp.broadcasts || d.broadcasts || []).map((b) => b.media?.shortName).filter(Boolean);
     const watch = watchLinks(networks);
     const venue = d.gameInfo?.venue || comp.venue || {};
-    const game = { // just enough of a schedule game for the radio and weather helpers
+    const game = { // just enough of a schedule game for the watch, radio and weather helpers
       id: String(comp.id || d.header.id), sport: sportKey, state: st.state, date: new Date(comp.date), timeValid: comp.timeValid !== false,
+      networks,
       venue: venue.fullName || '', city: [venue.address?.city, venue.address?.state].filter(Boolean).join(', '),
     };
     const isLive = st.state === 'in';
@@ -676,11 +684,10 @@
         <h2>How to watch</h2>
         <div class="watch-row">
           ${networks.length ? `<span>📺 <b>${esc(networks.join(' / '))}</b></span>` : '<span class="muted">Broadcast TBA</span>'}
-          ${watch.map((w) => `<a class="btn ${w.cls}" href="${esc(w.href)}" target="_blank" rel="noopener">▶ ${esc(w.label)}</a>`).join('')}
-          ${listenLink(game, 'btn secondary')}
+          <span class="acts">${serviceActions(game)}</span>
         </div>
         ${wantsWeather(game) ? `<div class="wx-line">Game-day forecast: ${wxSlot(game, true)}</div>` : ''}
-        <p class="small muted" style="margin-bottom:0">YouTube TV doesn't allow its stream to be embedded in other sites, so this button opens the YouTube TV live guide (or app on your phone).</p>
+        ${game.state !== 'post' && watch[0]?.cls === 'ytv' ? '<p class="small muted" style="margin-bottom:0">YouTube TV doesn\'t allow its stream to be embedded in other sites, so Watch opens the YouTube TV live guide (or app on your phone).</p>' : ''}
       </section>
 
       <div class="tabs">${tabs.map(([k, l]) => `<button class="tab ${k === gameState.tab ? 'active' : ''}" data-tab="${k}">${l}</button>`).join('')}</div>

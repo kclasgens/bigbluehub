@@ -90,6 +90,7 @@
       home: uk.homeAway === 'home',
       ukTeam: uk.team || {},
       opp: opp?.team || {},
+      ukRank: rankOf(uk),
       oppRank: rankOf(opp),
       venue: comp.venue?.fullName || '',
       city: [comp.venue?.address?.city, comp.venue?.address?.state].filter(Boolean).join(', '),
@@ -163,10 +164,19 @@
     return CFG.radio && mode && g.state !== 'post' ? { ...CFG.radio, select: mode === 'select' } : null;
   };
   const listenTitle = (r) => `${r.label} on ${r.station}${r.select ? ' (select matches are on the radio)' : ''}`;
-  // Game cards are links themselves, so the radio button inside them is a span handled by the click delegate.
-  const listenChip = (g) => {
+  // Buttons along the bottom of a game card. The card itself is a link to the game page, so these are
+  // spans: Follow live / Preview just let the click reach the card, and Watch / Listen open their
+  // service through the click delegate (data-open).
+  const cardActions = (g) => {
+    if (g.state === 'post') return '';
+    const page = g.state === 'in'
+      ? '<span class="act primary">📡 Follow live</span>'
+      : '<span class="act">📋 Preview</span>';
+    const tv = watchLinks(g.networks)[0];
+    const watch = tv ? `<span class="act" role="link" tabindex="0" data-open="${esc(tv.href)}" title="${esc(tv.label)}">📺 Watch</span>` : '';
     const r = radioFor(g);
-    return r ? `<span class="listen" role="link" tabindex="0" data-listen="${esc(r.url)}" title="${esc(listenTitle(r))}">🎧 Listen live</span>` : '';
+    const listen = r ? `<span class="act" role="link" tabindex="0" data-open="${esc(r.url)}" title="${esc(listenTitle(r))}">🎧 Listen</span>` : '';
+    return `<div class="acts">${page}${watch}${listen}</div>`;
   };
   const listenLink = (g, cls = 'listen') => {
     const r = radioFor(g);
@@ -227,7 +237,7 @@
 
   // Two-line live score (away team on top, as on a TV score bug).
   function liveScore(g) {
-    const uk = { team: g.ukTeam, name: 'Kentucky', score: g.ukScore, uk: true };
+    const uk = { team: g.ukTeam, name: `${g.ukRank || ''}Kentucky`, score: g.ukScore, uk: true };
     const opp = { team: g.opp, name: `${g.oppRank}${g.opp.shortDisplayName || g.opp.displayName || ''}`, score: g.oppScore };
     const rows = g.home ? [opp, uk] : [uk, opp];
     const lead = Number(uk.score) > Number(opp.score) ? uk : Number(opp.score) > Number(uk.score) ? opp : null;
@@ -254,7 +264,7 @@
           <div>📺 <b>${esc(tvText(g))}</b></div>
           ${wxSlot(g)}
         </div>
-        ${listenChip(g)}
+        ${cardActions(g)}
       </a>`;
   }
 
@@ -270,44 +280,6 @@
           ${dayGames.length ? dayGames.map(gameCard).join('') : '<div class="nogame">No games</div>'}
         </div>`;
     }).join('')}</div>`;
-  }
-
-  // Big photo banner for the next (or live) game on the home page.
-  function homeBanner(g) {
-    const s = SPORTS[g.sport];
-    if (g.state === 'in') return liveBanner(g);
-    const when = `${esc(g.date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }))} · ${g.timeValid ? esc(fmtTime(g.date)) : 'Time TBA'}`;
-    return `
-      <section class="home-banner">
-        <div>
-          <div class="eyebrow">${g.state === 'in' ? 'Happening now' : 'Next up'} · Kentucky ${esc(s.label)}</div>
-          <h1>${whereText(g) === '@' ? 'at' : 'vs'} ${esc(g.oppRank)}${esc(g.opp.displayName || g.opp.shortDisplayName)}</h1>
-          <div class="when">${when}</div>
-          <div class="when small">📍 ${esc(g.venue)}${g.city ? `, ${esc(g.city)}` : ''} · 📺 ${esc(tvText(g))}</div>
-          ${wxSlot(g, true)}
-          <div class="banner-btns"><a class="btn" href="#/game/${g.sport}/${g.id}">${g.state === 'in' ? 'Follow live' : 'Game preview'} →</a>${listenLink(g, 'btn ghost')}</div>
-        </div>
-        <img class="opp-logo" src="${esc(logoOf(g.opp))}" alt="">
-      </section>`;
-  }
-
-  // The home banner while Kentucky is playing: big score and game clock.
-  function liveBanner(g) {
-    const s = SPORTS[g.sport];
-    const side = (team, name, score) => `
-      <div class="lb-team"><img src="${esc(logoOf(team))}" alt=""><span class="lb-name">${esc(name)}</span><span class="lb-pts">${esc(score ?? '–')}</span></div>`;
-    const uk = side(g.ukTeam, 'Kentucky', g.ukScore);
-    const opp = side(g.opp, `${g.oppRank}${g.opp.shortDisplayName || g.opp.displayName || ''}`, g.oppScore);
-    return `
-      <section class="home-banner live">
-        <div class="lb-main">
-          <div class="eyebrow"><span class="live-pill">LIVE</span> Kentucky ${esc(s.label)}</div>
-          <div class="lb-score">${g.home ? opp + uk : uk + opp}</div>
-          <div class="lb-clock">${esc(g.clock || g.detail)}</div>
-          <div class="when small">📺 ${esc(tvText(g))}${g.venue ? ` · 📍 ${esc(g.venue)}` : ''}</div>
-          <div class="banner-btns"><a class="btn" href="#/game/${g.sport}/${g.id}">Follow live →</a>${listenLink(g, 'btn ghost')}</div>
-        </div>
-      </section>`;
   }
 
   function scheduleTable(games) {
@@ -340,13 +312,9 @@
 
     const draw = () => {
       const now = new Date();
-      const live = data.games.filter((g) => g.state === 'in');
       const recent = data.games.filter((g) => g.state === 'post' && now - g.date < 14 * 864e5).slice(-6).reverse();
       const next = data.games.find((g) => g.state === 'pre');
-      const featured = live[0] || next;
       view.innerHTML = `
-        ${featured ? homeBanner(featured) : ''}
-        ${live.length ? `<section class="card"><h2><span class="live-dot">LIVE NOW</span></h2><div class="week" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">${live.map(gameCard).join('')}</div></section>` : ''}
         <section class="card">
           <h2>This week <span class="small muted" style="text-transform:none;letter-spacing:0">${esc(fmtDay(now))} – ${esc(fmtDay(new Date(now.getTime() + 6 * 864e5)))}</span></h2>
           ${weekGrid(data.games)}
@@ -360,7 +328,6 @@
       `;
       bindRowLinks(view);
       fillWeather(view, data.games);
-      if (featured) bannerPhoto(featured.sport).then((url) => setPhoto(view.querySelector('.home-banner'), url));
     };
     draw();
 
@@ -908,8 +875,8 @@
     playerVideo.play().catch(() => { /* autoplay blocked; controls are there */ });
   }
   view.addEventListener('click', (e) => {
-    const listen = e.target.closest('[data-listen]');
-    if (listen) { e.preventDefault(); window.open(listen.dataset.listen, '_blank', 'noopener'); return; }
+    const open = e.target.closest('[data-open]');
+    if (open) { e.preventDefault(); window.open(open.dataset.open, '_blank', 'noopener'); return; }
     const btn = e.target.closest('.video[data-src]');
     if (btn) openPlayer(btn.dataset);
     const item = e.target.closest('.news-item');
@@ -922,8 +889,8 @@
     }
   });
   view.addEventListener('keydown', (e) => {
-    const listen = e.key === 'Enter' && e.target.closest('[data-listen]');
-    if (listen) { e.preventDefault(); window.open(listen.dataset.listen, '_blank', 'noopener'); }
+    const open = e.key === 'Enter' && e.target.closest('[data-open]');
+    if (open) { e.preventDefault(); window.open(open.dataset.open, '_blank', 'noopener'); }
   });
 
   // ---------- official UKAthletics.com news ----------

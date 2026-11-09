@@ -245,11 +245,14 @@ button { font: inherit; }
 .gcard .opp .va { color: var(--muted); font-weight: 600; font-size: 12px; }
 .gcard .meta { font-size: 12px; color: var(--muted); margin-top: 6px; display: grid; gap: 2px; }
 .gcard .wx b { color: var(--text); }
-.gcard .listen {
-  display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; padding: 3px 9px; border-radius: 999px;
+.gcard .acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.gcard .act {
+  display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px; border-radius: 999px; white-space: nowrap;
   font-size: 12px; font-weight: 700; color: var(--uk-blue); background: color-mix(in srgb, var(--uk-blue) 10%, transparent);
 }
-.gcard .listen:hover { background: var(--uk-blue); color: #fff; }
+.gcard .act.primary { background: var(--live); color: #fff; }
+.gcard .act:hover { background: var(--uk-blue); color: #fff; }
+.gcard .act.primary:hover { background: color-mix(in srgb, var(--live) 85%, #000); }
 .wx-line { margin-top: 10px; font-size: 14px; }
 .wx-line .wx { display: inline; }
 .gcard .meta b { color: var(--text); font-weight: 600; }
@@ -473,8 +476,8 @@ button { font: inherit; }
 .note code { font-size: 12px; }
 
 /* ---------- Photo banners ---------- */
-/* Any blue hero (scoreboard, team header, home banner) can carry a photo via --photo. */
-.home-banner.has-photo, .team-hero.has-photo {
+/* Any blue hero (scoreboard, team header) can carry a photo via --photo. */
+.team-hero.has-photo {
   background:
     linear-gradient(100deg, rgba(0, 30, 100, .96) 0%, rgba(0, 51, 160, .82) 45%, rgba(0, 51, 160, .35) 100%),
     var(--photo) center / cover no-repeat,
@@ -486,47 +489,14 @@ button { font: inherit; }
     var(--photo) center / cover no-repeat,
     var(--uk-blue);
 }
-.team-hero, .scorebug, .home-banner { position: relative; overflow: hidden; box-shadow: 0 6px 24px rgba(0, 30, 100, .22); }
-.team-hero::after, .scorebug::after, .home-banner::after {
+.team-hero, .scorebug { position: relative; overflow: hidden; box-shadow: 0 6px 24px rgba(0, 30, 100, .22); }
+.team-hero::after, .scorebug::after {
   /* faint pinstripe over the photo to tie it to the page texture */
   content: ""; position: absolute; inset: 0; pointer-events: none;
   background: repeating-linear-gradient(135deg, rgba(255,255,255,.045) 0 1px, transparent 1px 10px);
 }
-.team-hero > *, .scorebug > *, .home-banner > * { position: relative; z-index: 1; }
+.team-hero > *, .scorebug > * { position: relative; z-index: 1; }
 .photo-credit { position: absolute; right: 10px; bottom: 6px; font-size: 10px; opacity: .6; z-index: 1; }
-
-.home-banner {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 16px;
-  min-height: 190px; padding: 24px 26px; margin-bottom: 20px; border-radius: var(--radius); color: #fff;
-  background: linear-gradient(135deg, var(--uk-blue), var(--uk-blue-dark));
-}
-.home-banner .eyebrow { font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; opacity: .85; }
-.home-banner h1 { margin: 6px 0 8px; font-size: 30px; line-height: 1.1; }
-.home-banner .when { font-size: 15px; opacity: .95; }
-.home-banner .btn { background: #fff; color: var(--uk-blue); }
-.home-banner .banner-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
-.home-banner .btn.ghost { background: rgba(255, 255, 255, .14); color: #fff; border: 1px solid rgba(255, 255, 255, .5); }
-.home-banner .wx { margin-top: 4px; font-size: 13px; opacity: .9; }
-.home-banner.live { border: 3px solid var(--live); }
-.live-pill {
-  display: inline-flex; align-items: center; gap: 6px; background: var(--live); color: #fff; border-radius: 999px;
-  padding: 2px 10px 2px 8px; margin-right: 6px; letter-spacing: .08em;
-}
-.live-pill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #fff; animation: pulse 1.4s infinite; }
-.lb-main { flex: 1; min-width: 0; }
-.lb-score { display: grid; gap: 6px; margin: 10px 0 6px; max-width: 460px; }
-.lb-team { display: flex; align-items: center; gap: 12px; }
-.lb-team img { width: 44px; height: 44px; object-fit: contain; background: rgba(255,255,255,.95); border-radius: 50%; padding: 5px; flex: none; }
-.lb-name { flex: 1; min-width: 0; font-size: 22px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lb-pts { font-size: 40px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
-.lb-clock { font-size: 17px; font-weight: 800; margin-bottom: 4px; }
-.home-banner .opp-logo { width: 96px; height: 96px; object-fit: contain; background: rgba(255,255,255,.95); border-radius: 50%; padding: 12px; }
-@media (max-width: 640px) {
-  .home-banner { padding: 18px; min-height: 150px; }
-  .home-banner h1 { font-size: 22px; }
-  .lb-name { font-size: 18px; } .lb-pts { font-size: 32px; } .lb-team img { width: 36px; height: 36px; }
-  .home-banner .opp-logo { width: 64px; height: 64px; padding: 8px; }
-}
 
 /* Section titles get a small UK-blue marker. */
 .card > h2::before { content: none; }
@@ -534,7 +504,7 @@ button { font: inherit; }
 .card > h2::after {
   content: ""; position: absolute; left: 0; top: 2px; bottom: 2px; width: 4px; border-radius: 2px; background: var(--uk-blue);
 }
-@media (prefers-color-scheme: dark) { .card > h2::after { background: var(--uk-accent); } .titles .count, .news-item .src.uk, .gcard .listen { color: var(--uk-accent); } .gcard .listen:hover { color: #fff; } }
+@media (prefers-color-scheme: dark) { .card > h2::after { background: var(--uk-accent); } .titles .count, .news-item .src.uk, .gcard .act:not(.primary) { color: var(--uk-accent); } .gcard .act:hover { color: #fff; } }
 
 /* Roster headshots */
 .roster-list li { grid-template-columns: 30px 40px 1fr; align-items: center; }

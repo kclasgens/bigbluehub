@@ -233,13 +233,15 @@
   const whereText = (g) => (g.neutral ? 'vs' : g.home ? 'vs' : '@');
 
   // ---------- components ----------
-  function statusLine(g) {
+  // withDate adds the day for cards shown outside the week grid (where the day heading gives it).
+  function statusLine(g, withDate) {
     if (g.state === 'in') return `<span class="live-dot">LIVE</span>${g.ukScore != null ? ` <span class="score">${esc(g.ukScore)}-${esc(g.oppScore)}</span>` : ''} <span class="small">${esc(g.clock || g.detail)}</span>`;
     if (g.state === 'post') {
       if (!g.result) return `<span class="small muted">${esc(g.detail)}</span>`;
       return `<span class="result-${g.result}">${g.result}</span> <span class="score">${esc(g.ukScore)}-${esc(g.oppScore)}</span>`;
     }
-    return `<span class="small"><b>${g.timeValid ? esc(fmtTime(g.date)) : 'TBA'}</b></span>`;
+    const time = g.timeValid ? fmtTime(g.date) : 'Time TBA';
+    return `<span class="small"><b>${esc(withDate ? `${fmtDay(g.date)} · ${time}` : time)}</b></span>`;
   }
 
   // Two-line live score (away team on top, as on a TV score bug).
@@ -256,12 +258,12 @@
   // Sport label on game cards and schedule rows: the sport's emoji, named for screen readers.
   const sportTag = (s) => `<span class="tag emoji ${s.short}" role="img" aria-label="${esc(s.label)}" title="${esc(s.label)}">${esc(s.emoji || s.short)}</span>`;
 
-  function gameCard(g) {
+  function gameCard(g, withDate) {
     const s = SPORTS[g.sport];
     const live = g.state === 'in';
     return `
       <a class="gcard${live ? ' live' : ''}" href="#/game/${g.sport}/${g.id}">
-        <div class="row1">${sportTag(s)}${live ? '<span class="live-dot">LIVE</span>' : statusLine(g)}</div>
+        <div class="row1">${sportTag(s)}${live ? '<span class="live-dot">LIVE</span>' : statusLine(g, withDate)}</div>
         ${live ? liveScore(g) : `<div class="opp">
           <img src="${esc(logoOf(g.opp))}" alt="" loading="lazy">
           <div><span class="va">${whereText(g)}</span> ${esc(g.oppRank)}${esc(g.opp.shortDisplayName || g.opp.displayName)}</div>
@@ -286,7 +288,7 @@
         <div class="day ${i === 0 ? 'today' : ''}">
           <div class="day-head"><span>${i === 0 ? 'Today' : d.toLocaleDateString(undefined, { weekday: 'short' })}</span>
             <span class="dnum">${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span></div>
-          ${dayGames.map(gameCard).join('')}
+          ${dayGames.map((g) => gameCard(g)).join('')}
         </div>`).join('')}</div>`;
   }
 
@@ -446,7 +448,7 @@
       const drawGames = () => {
         if (!current()) return;
         view.querySelector('#t-next h2').textContent = next?.state === 'in' ? 'Live now' : 'Up next';
-        fill('#t-next', next ? `<div class="next-wrap">${gameCard(next)}</div>` : '<div class="empty">No upcoming games scheduled yet.</div>');
+        fill('#t-next', next ? `<div class="next-wrap">${gameCard(next, true)}</div>` : '<div class="empty">No upcoming games scheduled yet.</div>');
         fill('#t-schedule', scheduleTable(games));
         bindRowLinks(view.querySelector('#t-schedule'));
         fillWeather(view, games);

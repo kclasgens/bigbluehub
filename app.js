@@ -275,18 +275,19 @@
       </a>`;
   }
 
+  // Only days with games are shown.
   function weekGrid(games) {
     const start = new Date(); start.setHours(0, 0, 0, 0);
-    const days = Array.from({ length: 7 }, (_, i) => new Date(start.getTime() + i * 864e5));
-    return `<div class="week">${days.map((d, i) => {
-      const dayGames = games.filter((g) => sameDay(g.date, d));
-      return `
-        <div class="day ${i === 0 ? 'today' : ''} ${dayGames.length ? 'has-games' : ''}">
+    const days = Array.from({ length: 7 }, (_, i) => new Date(start.getTime() + i * 864e5))
+      .map((d, i) => ({ d, i, games: games.filter((g) => sameDay(g.date, d)) }))
+      .filter((day) => day.games.length);
+    if (!days.length) return '<div class="empty">No games this week.</div>';
+    return `<div class="week">${days.map(({ d, i, games: dayGames }) => `
+        <div class="day ${i === 0 ? 'today' : ''}">
           <div class="day-head"><span>${i === 0 ? 'Today' : d.toLocaleDateString(undefined, { weekday: 'short' })}</span>
             <span class="dnum">${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span></div>
-          ${dayGames.length ? dayGames.map(gameCard).join('') : '<div class="nogame">No games</div>'}
-        </div>`;
-    }).join('')}</div>`;
+          ${dayGames.map(gameCard).join('')}
+        </div>`).join('')}</div>`;
   }
 
   function scheduleTable(games) {
